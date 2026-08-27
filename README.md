@@ -41,9 +41,23 @@
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Recommended)
 
-1. Start the platform locally:
+Cowbox is officially distributed as a Python package. You can install and boot it on any machine with Docker in just two commands:
+
+```bash
+pip install cowbox
+cowbox start
+```
+
+*During boot, it will prompt you to set up your Admin credentials and automatically launch the dashboard on `http://localhost:9999`.*
+
+---
+
+## 🛠️ Developer Setup (Local Next.js)
+
+If you want to modify the Cowbox source code:
+1. Clone the repository and install dependencies:
 ```bash
 npm install
 npm run dev
