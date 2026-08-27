@@ -1,0 +1,2 @@
+[console_scripts]
+cowbox = cowbox.cli:main

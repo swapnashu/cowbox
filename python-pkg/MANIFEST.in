@@ -1,0 +1,5 @@
+recursive-include cowbox/source *
+global-exclude node_modules/*
+global-exclude .next/*
+global-exclude data/*
+global-exclude *.db
