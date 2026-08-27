@@ -5,6 +5,15 @@
 ![Cowbox Status](https://img.shields.io/badge/Status-Beta-emerald?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
+### 📸 Dashboard Overview
+![Cowbox Dashboard](https://raw.githubusercontent.com/swapnashu/cowbox/main/public/screenshots/dashboard.png)
+
+### 📸 Master Control Panel
+![Master Panel](https://raw.githubusercontent.com/swapnashu/cowbox/main/public/screenshots/master.png)
+
+### 📸 Project Management
+![Projects](https://raw.githubusercontent.com/swapnashu/cowbox/main/public/screenshots/projects.png)
+
 ---
 
 ## ✨ Features (v0.3.0)
