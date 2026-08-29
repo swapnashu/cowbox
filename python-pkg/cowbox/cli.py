@@ -37,15 +37,16 @@ def main():
 
         print(f"\n🚀 Starting Cowbox on port 9999...")
         
-        # We assume the user has the code cloned locally for this implementation,
-        # but in a real PyPI package we would extract the bundled code or pull the Docker image.
-        # Here we just run docker-compose or docker run using the current directory.
+        import tempfile
+        import shutil
         
-        cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-        
-        print(f"Building Docker image from {cwd} (this may take a few minutes)...")
+        temp_dir = tempfile.mkdtemp()
+        print(f"Downloading latest Cowbox version from GitHub into {temp_dir}...")
         try:
-            subprocess.run(["docker", "build", "-t", "cowbox:latest", cwd], check=True)
+            subprocess.run(["git", "clone", "https://github.com/swapnashu/cowbox.git", temp_dir], check=True)
+            
+            print("Building Docker image (this may take a few minutes)...")
+            subprocess.run(["docker", "build", "-t", "cowbox:latest", temp_dir], check=True)
             
             print("\nStarting container...")
             
@@ -59,6 +60,7 @@ def main():
                 "--name", "cowbox-server",
                 "-p", "9999:9999",
                 "-v", "/var/run/docker.sock:/var/run/docker.sock",
+                "-v", "cowbox-data:/app/data",
                 "-e", f"ADMIN_EMAIL={email}",
                 "-e", f"ADMIN_PASSWORD={password}",
                 "cowbox:latest"
