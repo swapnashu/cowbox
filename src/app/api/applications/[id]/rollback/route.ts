@@ -110,6 +110,7 @@ export async function POST(
     // Deploy new container using previous imageTag
     addLog(`Creating and launching container from previous image ${imageToRun}...`);
     const container = await deployAppContainer({
+      applicationId: app.id,
       appName: app.name,
       image: imageToRun,
       containerPort: app.containerPort,

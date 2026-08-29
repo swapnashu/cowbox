@@ -110,6 +110,22 @@ export const domains = sqliteTable("domains", {
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+export const volumes = sqliteTable("volumes", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  driver: text("driver").default("local").notNull(),
+  size: text("size"),
+  createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const appVolumes = sqliteTable("app_volumes", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),
+  volumeName: text("volume_name").references(() => volumes.name, { onDelete: "cascade" }).notNull(),
+  mountPath: text("mount_path").notNull(),
+  createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 export const deployments = sqliteTable("deployments", {
   id: text("id").primaryKey(),
   applicationId: text("application_id").references(() => applications.id, { onDelete: "cascade" }).notNull(),

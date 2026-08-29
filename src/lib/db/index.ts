@@ -131,6 +131,26 @@ export async function initializeDatabase() {
   `);
 
   await client.execute(`
+    CREATE TABLE IF NOT EXISTS volumes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      driver TEXT NOT NULL DEFAULT 'local',
+      size TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_volumes (
+      id TEXT PRIMARY KEY,
+      application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+      volume_name TEXT NOT NULL REFERENCES volumes(name) ON DELETE CASCADE,
+      mount_path TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS deployments (
       id TEXT PRIMARY KEY,
       application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,

@@ -1,5 +1,8 @@
 import Docker from "dockerode";
 import os from "os";
+import { db } from "@/lib/db";
+import { domains, appVolumes } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 // Detect Docker socket based on OS or environment variable
 export function getDockerClient(): Docker {
@@ -117,17 +120,46 @@ export function buildTraefikLabels(params: {
  * Create and run an application container
  */
 export async function deployAppContainer(options: {
+  applicationId: string;
   appName: string;
   image: string;
   containerPort: number;
   exposedPort?: number;
   envVars: string[];
-  labels: Record<string, string>;
+  labels?: Record<string, string>;
   memoryLimit?: string;
   cpuLimit?: string;
   restartPolicy?: string;
 }): Promise<Docker.Container> {
   await ensureCowboxNetwork();
+
+  // Fetch domains
+  const appDomains = await db.select().from(domains).where(eq(domains.applicationId, options.applicationId));
+  
+  // Fetch volumes
+  const volumesList = await db.select().from(appVolumes).where(eq(appVolumes.applicationId, options.applicationId));
+  
+  const labels: Record<string, string> = {
+    ...(options.labels || {}),
+    "traefik.enable": "true",
+    "cowbox.managed": "true",
+    "cowbox.app": options.appName,
+    [`traefik.http.services.${options.appName}.loadbalancer.server.port`]: options.containerPort.toString(),
+  };
+
+  appDomains.forEach((d) => {
+    // e.g. traefik.http.routers.app123-mydomain-com.rule=Host("mydomain.com")
+    const safeDomain = d.domain.replace(/[^a-zA-Z0-9]/g, "-");
+    const routerName = `${options.applicationId}-${safeDomain}`;
+    labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${d.domain}\`)`;
+    labels[`traefik.http.routers.${routerName}.entrypoints`] = "web,websecure";
+    if (d.https) {
+      labels[`traefik.http.routers.${routerName}.tls`] = "true";
+      labels[`traefik.http.routers.${routerName}.tls.certresolver`] = d.certificateResolver || "letsencrypt";
+    }
+  });
+
+  const binds = volumesList.map(v => `${v.volumeName}:${v.mountPath}`);
 
   // Parse memory limit to bytes if provided (e.g. 512m -> 536870912)
   let memoryBytes = 0;
@@ -162,7 +194,7 @@ export async function deployAppContainer(options: {
     Image: options.image,
     name: `cowbox-${options.appName}-${Date.now().toString().slice(-6)}`,
     Env: options.envVars,
-    Labels: options.labels,
+    Labels: labels,
     HostConfig: {
       NetworkMode: COWBOX_NETWORK,
       PortBindings: portBindings,
@@ -171,6 +203,7 @@ export async function deployAppContainer(options: {
       },
       Memory: memoryBytes > 0 ? memoryBytes : undefined,
       NanoCpus: nanoCpus > 0 ? nanoCpus : undefined,
+      Binds: binds.length > 0 ? binds : undefined,
     },
   });
 

@@ -49,7 +49,7 @@ export default function SingleProjectPage() {
   const [dockerImage, setDockerImage] = useState("nginx:alpine");
   const [gitRepository, setGitRepository] = useState("");
   const [gitBranch, setGitBranch] = useState("main");
-  const [buildPack, setBuildPack] = useState("node");
+  const [buildPack, setBuildPack] = useState("nixpacks");
   const [dockerfileContent, setDockerfileContent] = useState("FROM node:20-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD [\"npm\", \"start\"]");
   const [containerPort, setContainerPort] = useState("80");
   const [exposedPort, setExposedPort] = useState("");
@@ -182,7 +182,7 @@ export default function SingleProjectPage() {
         setAppName("");
         setDockerImage("nginx:alpine");
         setGitRepository("");
-        setBuildPack("node");
+        setBuildPack("nixpacks");
         setZipFile(null);
         setDomain("");
         fetchProject();
@@ -666,6 +666,7 @@ export default function SingleProjectPage() {
                     onChange={(e) => setBuildPack(e.target.value)}
                     className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
+                    <option value="nixpacks">Nixpacks (Zero Config)</option>
                     <option value="node">Node.js</option>
                     <option value="python">Python</option>
                     <option value="php">PHP Apache</option>
@@ -735,6 +736,7 @@ export default function SingleProjectPage() {
                           onChange={(e) => setBuildPack(e.target.value)}
                           className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         >
+                          <option value="nixpacks">Nixpacks (Zero Config)</option>
                           <option value="node">Node.js</option>
                           <option value="python">Python</option>
                           <option value="php">PHP Apache</option>

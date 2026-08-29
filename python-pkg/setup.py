@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cowbox",
-    version="0.1.0",
+    version="0.1.1",
     description="Cowbox - Self-Hosted PaaS Management Hub",
     author="Cowbox Team",
     packages=find_packages(),

@@ -92,9 +92,9 @@ export async function POST(
       } catch (err: any) {
         addLog(`Image pull notice: ${err.message} (attempting to use local image)`);
       }
-    } else if (app.appType === "git") {
+    } else if (app.appType === "git" || app.appType === "nixpacks") {
       if (!app.gitRepository) {
-        throw new Error("Git repository is required for git deployment.");
+        throw new Error("Git repository is required for git/nixpacks deployment.");
       }
 
       addLog(`Cloning repository ${app.gitRepository} (branch: ${app.gitBranch || "main"})...`);
@@ -104,35 +104,45 @@ export async function POST(
         await execAsync(`git clone -b ${app.gitBranch || "main"} "${app.gitRepository}" "${tmpDir}"`);
         addLog(`Repository cloned successfully.`);
 
-        let dockerfileContent = "";
-        const buildPack = app.buildPack || "node";
-        
-        addLog(`Using build pack: ${buildPack}`);
+        if (app.appType === "nixpacks") {
+          const tag = `cowbox-app-${app.id}-${Date.now()}`;
+          addLog(`Building with Nixpacks: ${tag}...`);
+          
+          await execAsync(`docker run --rm -v //var/run/docker.sock:/var/run/docker.sock -v "${tmpDir}":"${tmpDir}" -w "${tmpDir}" ghcr.io/railwayapp/nixpacks build . --name ${tag}`);
+          addLog(`Nixpacks Image built successfully.`);
+          
+          imageToRun = tag;
+        } else {
+          let dockerfileContent = "";
+          const buildPack = app.buildPack || "node";
+          
+          addLog(`Using build pack: ${buildPack}`);
 
-        if (buildPack === "node") {
-          dockerfileContent = `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install --production\nCOPY . .\nCMD ["npm", "start"]`;
-        } else if (buildPack === "python") {
-          dockerfileContent = `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nCMD ["python", "main.py"]`;
-        } else if (buildPack === "php") {
-          dockerfileContent = `FROM php:8.2-apache\nCOPY . /var/www/html/`;
-        } else if (buildPack === "static") {
-          dockerfileContent = `FROM nginx:alpine\nCOPY . /usr/share/nginx/html/`;
-        } else if (buildPack === "dockerfile") {
-          addLog(`Using existing Dockerfile from repository.`);
+          if (buildPack === "node") {
+            dockerfileContent = `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install --production\nCOPY . .\nCMD ["npm", "start"]`;
+          } else if (buildPack === "python") {
+            dockerfileContent = `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nCMD ["python", "main.py"]`;
+          } else if (buildPack === "php") {
+            dockerfileContent = `FROM php:8.2-apache\nCOPY . /var/www/html/`;
+          } else if (buildPack === "static") {
+            dockerfileContent = `FROM nginx:alpine\nCOPY . /usr/share/nginx/html/`;
+          } else if (buildPack === "dockerfile") {
+            addLog(`Using existing Dockerfile from repository.`);
+          }
+
+          if (dockerfileContent && buildPack !== "dockerfile") {
+            await fs.writeFile(path.join(tmpDir, "Dockerfile"), dockerfileContent);
+            addLog(`Generated Dockerfile for ${buildPack} buildpack.`);
+          }
+
+          const tag = `cowbox-app-${app.id}:${Date.now()}`;
+          addLog(`Building Docker image ${tag}...`);
+          
+          await execAsync(`docker build -t ${tag} "${tmpDir}"`);
+          addLog(`Image built successfully.`);
+          
+          imageToRun = tag;
         }
-
-        if (dockerfileContent && buildPack !== "dockerfile") {
-          await fs.writeFile(path.join(tmpDir, "Dockerfile"), dockerfileContent);
-          addLog(`Generated Dockerfile for ${buildPack} buildpack.`);
-        }
-
-        const tag = `cowbox-app-${app.id}:${Date.now()}`;
-        addLog(`Building Docker image ${tag}...`);
-        
-        await execAsync(`docker build -t ${tag} "${tmpDir}"`);
-        addLog(`Image built successfully.`);
-        
-        imageToRun = tag;
       } finally {
         await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
       }
@@ -141,6 +151,7 @@ export async function POST(
     // Deploy new container
     addLog(`Creating and launching container...`);
     const container = await deployAppContainer({
+      applicationId: app.id,
       appName: app.name,
       image: imageToRun,
       containerPort: app.containerPort,

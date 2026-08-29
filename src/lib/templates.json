@@ -1,0 +1,23 @@
+[
+  {
+    "id": "wordpress",
+    "name": "WordPress",
+    "description": "The world's most popular website builder.",
+    "logo": "https://s.w.org/style/images/about/WordPress-logotype-wmark.png",
+    "composeYaml": "services:\n  wordpress:\n    image: wordpress:latest\n    restart: always\n    environment:\n      WORDPRESS_DB_HOST: db\n      WORDPRESS_DB_USER: wpuser\n      WORDPRESS_DB_PASSWORD: wppassword\n      WORDPRESS_DB_NAME: wordpress\n  db:\n    image: mysql:8.0\n    restart: always\n    environment:\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wpuser\n      MYSQL_PASSWORD: wppassword\n      MYSQL_RANDOM_ROOT_PASSWORD: '1'\n    volumes:\n      - db_data:/var/lib/mysql\nvolumes:\n  db_data:"
+  },
+  {
+    "id": "ghost",
+    "name": "Ghost",
+    "description": "Turn your audience into a business. Publishing, memberships, subscriptions and newsletters.",
+    "logo": "https://ghost.org/images/ghost-logo.svg",
+    "composeYaml": "services:\n  ghost:\n    image: ghost:5-alpine\n    restart: always\n    environment:\n      database__client: mysql\n      database__connection__host: db\n      database__connection__user: root\n      database__connection__password: rootpassword\n      database__connection__database: ghost\n      url: http://localhost:8080\n  db:\n    image: mysql:8.0\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: rootpassword\n    volumes:\n      - db_data:/var/lib/mysql\nvolumes:\n  db_data:"
+  },
+  {
+    "id": "plausible",
+    "name": "Plausible Analytics",
+    "description": "Simple, open-source, lightweight (< 1 KB) and privacy-friendly web analytics alternative to Google Analytics.",
+    "logo": "https://plausible.io/images/logo.svg",
+    "composeYaml": "services:\n  plausible:\n    image: plausible/analytics:v2\n    restart: always\n    environment:\n      BASE_URL: http://localhost:8000\n      SECRET_KEY_BASE: some_secret_key\n      DATABASE_URL: postgres://postgres:postgres@plausible_db:5432/plausible_db\n      CLICKHOUSE_DATABASE_URL: http://plausible_events_db:8123/plausible_events_db\n  plausible_db:\n    image: postgres:14-alpine\n    restart: always\n    environment:\n      POSTGRES_PASSWORD: postgres\n    volumes:\n      - db_data:/var/lib/postgresql/data\n  plausible_events_db:\n    image: clickhouse/clickhouse-server:23.3-alpine\n    restart: always\n    volumes:\n      - event_data:/var/lib/clickhouse\nvolumes:\n  db_data:\n  event_data:"
+  }
+]
