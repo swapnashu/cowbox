@@ -34,8 +34,12 @@ export function middleware(request: NextRequest) {
   ];
 
   const isPublicPath = publicPaths.some(p => path.startsWith(p) || path === p);
+  const authHeader = request.headers.get("authorization") || request.headers.get("x-api-key");
 
-  if (!isPublicPath && !cookie) {
+  if (!isPublicPath && !cookie && !authHeader) {
+    if (path.startsWith('/api/')) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

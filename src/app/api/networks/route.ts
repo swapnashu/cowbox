@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import Docker from "dockerode";
-
-const docker = new Docker({ socketPath: "//./pipe/docker_engine" }); // default windows socket, or can just use new Docker() which works mostly. We will use generic initialization.
+import { docker } from "@/lib/docker";
 
 export async function GET() {
   try {
-    const dockerInstance = new Docker();
-    const networks = await dockerInstance.listNetworks();
+    const networks = await docker.listNetworks();
     
-    const formattedNetworks = networks.map(net => {
+    const formattedNetworks = networks.map((net) => {
       const containers = Object.entries(net.Containers || {}).map(([id, info]: [string, any]) => ({
-        id,
+        id: id.substring(0, 12),
         name: info.Name,
-        ipAddress: info.IPv4Address
+        ipv4: info.IPv4Address,
+        ipAddress: info.IPv4Address,
       }));
 
       return {
@@ -20,32 +18,31 @@ export async function GET() {
         name: net.Name,
         driver: net.Driver,
         scope: net.Scope,
-        containers
+        containers,
       };
     });
 
-    return NextResponse.json(formattedNetworks);
-  } catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ networks: formattedNetworks });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to fetch networks", networks: [] }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, driver = 'bridge' } = await req.json();
+    const { name, driver = "bridge" } = await req.json();
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const dockerInstance = new Docker();
-    const network = await dockerInstance.createNetwork({
+    const network = await docker.createNetwork({
       Name: name,
-      Driver: driver
+      Driver: driver,
     });
 
     return NextResponse.json({ id: network.id, name, driver });
-  } catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to create network" }, { status: 500 });
   }
 }
 
@@ -56,12 +53,11 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const dockerInstance = new Docker();
-    const network = dockerInstance.getNetwork(id);
+    const network = docker.getNetwork(id);
     await network.remove();
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to delete network" }, { status: 500 });
   }
 }

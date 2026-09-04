@@ -1,7 +1,12 @@
 Metadata-Version: 2.4
 Name: cowbox
-Version: 0.1.1
+Version: 0.2.0
 Summary: Cowbox - Self-Hosted PaaS Management Hub
 Author: Cowbox Team
+Description-Content-Type: text/markdown
 Dynamic: author
+Dynamic: description
+Dynamic: description-content-type
 Dynamic: summary
+
+Cowbox is an open-source, self-hosted Platform-as-a-Service (PaaS) and container control plane alternative to Dokploy, Coolify, and Easypanel.

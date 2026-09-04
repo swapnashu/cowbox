@@ -47,10 +47,11 @@ ls -la 2>/dev/null || dir
 
 // Prevent path traversal
 export function resolveSafePath(relativePath: string): string {
-  const root = ensureWorkspaceDir();
+  const root = path.resolve(ensureWorkspaceDir());
   const safeRelative = relativePath ? relativePath.replace(/^(\.\.[\/\\])+/, "") : "";
   const resolved = path.resolve(root, safeRelative);
-  if (!resolved.startsWith(root)) {
+  const normalizedRoot = root.endsWith(path.sep) ? root : root + path.sep;
+  if (resolved !== root && !resolved.startsWith(normalizedRoot)) {
     throw new Error("Access denied: Path is outside workspace");
   }
   return resolved;

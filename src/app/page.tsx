@@ -178,15 +178,15 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/services" className="group">
+        <Link href="/docker" className="group">
           <Card className="p-4 hover:border-emerald-400 hover:shadow-md transition-all bg-gradient-to-tr from-emerald-50/40 to-white">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 group-hover:scale-105 transition-transform">
                 <Activity className="h-5 w-5" />
               </div>
               <div>
-                <span className="font-bold text-xs text-slate-900 block group-hover:text-emerald-600 transition-colors">Container Manager</span>
-                <span className="text-[11px] text-slate-500">Restart, Logs, Inspect</span>
+                <span className="font-bold text-xs text-slate-900 block group-hover:text-emerald-600 transition-colors">Docker Management Hub</span>
+                <span className="text-[11px] text-slate-500">Containers, Images, Volumes</span>
               </div>
             </div>
           </Card>

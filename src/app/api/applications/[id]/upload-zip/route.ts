@@ -43,8 +43,17 @@ export async function POST(
     }
     fs.mkdirSync(appBuildDir, { recursive: true });
 
-    // Extract zip contents
+    // Extract zip contents safely preventing Zip Slip
     const zip = new AdmZip(buffer);
+    const zipEntries = zip.getEntries();
+    const resolvedBuildDir = path.resolve(appBuildDir);
+
+    for (const entry of zipEntries) {
+      const targetPath = path.resolve(appBuildDir, entry.entryName);
+      if (!targetPath.startsWith(resolvedBuildDir + path.sep) && targetPath !== resolvedBuildDir) {
+        throw new Error(`Security Violation: Illegal path traversal detected in zip archive entry "${entry.entryName}"`);
+      }
+    }
     zip.extractAllTo(appBuildDir, true);
 
     const extractedFiles = fs.readdirSync(appBuildDir);

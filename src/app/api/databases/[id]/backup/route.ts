@@ -70,7 +70,13 @@ export async function POST(
         const container = docker.getContainer(database.containerId);
         let cmd = ["pg_dump", "-U", database.databaseUser || "postgres", database.databaseName];
         if (database.type === "mysql" || database.type === "mariadb") {
-          cmd = ["mysqldump", "-u", "root", `-p${database.rootPassword}`, database.databaseName];
+          cmd = ["mysqldump", "-u", database.databaseUser || "root", `-p${database.rootPassword}`, database.databaseName];
+        } else if (database.type === "redis") {
+          cmd = ["sh", "-c", database.rootPassword ? `redis-cli -a "${database.rootPassword}" bgsave` : "redis-cli bgsave"];
+        } else if (database.type === "mongodb") {
+          cmd = ["mongodump", "--archive"];
+        } else if (database.type === "clickhouse") {
+          cmd = ["clickhouse-client", "-q", `BACKUP DATABASE ${database.databaseName} TO Disk('backups', '${fileName}')`];
         }
 
         const exec = await container.exec({
@@ -79,11 +85,12 @@ export async function POST(
           AttachStderr: true,
         });
 
-        const stream = await exec.start({});
+        const stream = await exec.start({ hijack: true });
         const outputStream = fs.createWriteStream(filePath);
+        const errStream = new (require("stream").PassThrough)();
         
         await new Promise((resolve, reject) => {
-          stream.pipe(outputStream);
+          docker.modem.demuxStream(stream, outputStream, errStream);
           stream.on("end", resolve);
           stream.on("error", reject);
         });

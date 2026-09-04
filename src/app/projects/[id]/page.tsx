@@ -485,7 +485,7 @@ export default function SingleProjectPage() {
                     </Badge>
                   </div>
                   <div className="text-xs text-slate-600 mt-2 font-mono bg-slate-50 p-2 rounded-lg border border-slate-200 break-all">
-                    Host: dekployer-db-{db.name}
+                    Host: cowbox-db-{db.name}
                   </div>
                 </CardHeader>
                 <CardContent className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 bg-slate-50/50 p-4">

@@ -34,11 +34,12 @@ const navigationGroups = [
   {
     label: "Tools",
     items: [
+      { name: "Docker Hub", href: "/docker", icon: Layers },
       { name: "Master Panel", href: "/master", icon: Cpu },
       { name: "App Store", href: "/templates", icon: Zap },
       { name: "File Manager", href: "/files", icon: FolderCode },
       { name: "Cron Automation", href: "/cron", icon: Clock },
-      { name: "Running Services", href: "/services", icon: Layers },
+      { name: "Running Services", href: "/services", icon: Activity },
     ],
   },
   {

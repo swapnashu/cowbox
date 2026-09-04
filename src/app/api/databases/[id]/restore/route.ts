@@ -42,35 +42,46 @@ export async function POST(
 
     let restoreCmd: string[] = [];
     if (database.type === "postgres") {
-      restoreCmd = ["psql", "-U", database.databaseUser || "postgres", "-d", database.databaseName, "-c", sqlContent];
+      restoreCmd = ["psql", "-U", database.databaseUser || "postgres", "-d", database.databaseName];
     } else if (database.type === "mysql" || database.type === "mariadb") {
-      restoreCmd = ["mysql", "-u", database.databaseUser || "root", `-p${database.rootPassword}`, database.databaseName, "-e", sqlContent];
+      restoreCmd = ["mysql", "-u", database.databaseUser || "root", `-p${database.rootPassword}`, database.databaseName];
     } else {
       return NextResponse.json({ error: `Restore not supported for ${database.type} via SQL` }, { status: 400 });
     }
 
     const exec = await container.exec({
       Cmd: restoreCmd,
+      AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
     });
 
-    const stream = await exec.start({ hijack: true, stdin: false });
+    const stream = await exec.start({ hijack: true, stdin: true });
     let output = "";
+
     await new Promise<void>((resolve, reject) => {
       stream.on("data", (chunk: Buffer) => {
         output += chunk.toString("utf-8");
       });
       stream.on("end", () => resolve());
       stream.on("error", (err: any) => reject(err));
+
+      // Stream the SQL content into the container process's stdin
+      try {
+        stream.write(sqlContent);
+        stream.end();
+      } catch (err) {
+        reject(err);
+      }
     });
 
     const inspect = await exec.inspect();
+    const cleanOutput = output.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").trim();
 
     return NextResponse.json({
       success: inspect.ExitCode === 0,
       message: inspect.ExitCode === 0 ? "Database snapshot restored successfully!" : "Restore completed with warnings",
-      output: output.trim() || "OK",
+      output: cleanOutput || "OK",
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

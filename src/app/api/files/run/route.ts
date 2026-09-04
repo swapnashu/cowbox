@@ -15,37 +15,37 @@ export async function POST(req: Request) {
     } else if (filePath) {
       const fullPath = resolveSafePath(filePath);
       const ext = path.extname(fullPath).toLowerCase();
-      const filename = path.basename(fullPath);
+      const relPath = path.relative(WORKSPACE_ROOT, fullPath).replace(/\\/g, "/");
 
       switch (ext) {
         case ".js":
         case ".mjs":
-          cmdToRun = `node "${filename}"`;
+          cmdToRun = `node "${relPath}"`;
           break;
         case ".ts":
-          cmdToRun = `npx tsx "${filename}"`;
+          cmdToRun = `npx tsx "${relPath}"`;
           break;
         case ".py":
-          cmdToRun = `python "${filename}"`;
+          cmdToRun = `python "${relPath}"`;
           break;
         case ".sh":
         case ".bash":
-          cmdToRun = process.platform === "win32" ? `bash "${filename}"` : `sh "${filename}"`;
+          cmdToRun = process.platform === "win32" ? `bash "${relPath}"` : `sh "${relPath}"`;
           break;
         case ".go":
-          cmdToRun = `go run "${filename}"`;
+          cmdToRun = `go run "${relPath}"`;
           break;
         case ".php":
-          cmdToRun = `php "${filename}"`;
+          cmdToRun = `php "${relPath}"`;
           break;
         case ".rb":
-          cmdToRun = `ruby "${filename}"`;
+          cmdToRun = `ruby "${relPath}"`;
           break;
         case ".json":
-          cmdToRun = `node -e "console.log(JSON.stringify(require('./${filename}'), null, 2))"`;
+          cmdToRun = `node -e "console.log(JSON.stringify(require('./${relPath}'), null, 2))"`;
           break;
         default:
-          cmdToRun = process.platform === "win32" ? `type "${filename}"` : `cat "${filename}"`;
+          cmdToRun = process.platform === "win32" ? `type "${relPath}"` : `cat "${relPath}"`;
           break;
       }
     } else {

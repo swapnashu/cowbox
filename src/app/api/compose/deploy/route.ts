@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { composeStacks, projects } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { docker, ensureCowboxNetwork, COWBOX_NETWORK } from "@/lib/docker";
+import { docker, ensureCowboxNetwork, COWBOX_NETWORK, pullDockerImage } from "@/lib/docker";
 import YAML from "yaml";
+import crypto from "crypto";
 
 export async function POST(req: Request) {
   try {
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
       const containerName = `cowbox-stack-${name}-${sName}`;
 
       try {
-        await docker.pull(image);
+        await pullDockerImage(image);
       } catch (e) {}
 
       // Port mappings if any
@@ -61,6 +62,8 @@ export async function POST(req: Request) {
           const parts = p.toString().split(":");
           if (parts.length === 2) {
             portBindings[`${parts[1]}/tcp`] = [{ HostPort: parts[0] }];
+          } else if (parts.length === 3) {
+            portBindings[`${parts[2]}/tcp`] = [{ HostPort: parts[1] }];
           }
         }
       }
@@ -104,6 +107,29 @@ export async function POST(req: Request) {
 
       await container.start();
       deployedContainers.push(`${sName} (${container.id.substring(0, 12)})`);
+    }
+
+    // Persist/Update stack in database
+    const existingStack = await db.select().from(composeStacks).where(eq(composeStacks.name, name));
+    if (existingStack.length > 0) {
+      await db
+        .update(composeStacks)
+        .set({
+          composeYaml,
+          envVars,
+          status: "running",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(composeStacks.name, name));
+    } else {
+      await db.insert(composeStacks).values({
+        id: crypto.randomUUID(),
+        projectId,
+        name,
+        composeYaml,
+        envVars,
+        status: "running",
+      });
     }
 
     return NextResponse.json({

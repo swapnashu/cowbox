@@ -77,7 +77,7 @@ export async function POST() {
     // Execute deep prune
     const [prunedContainers, prunedImages, prunedVolumes, prunedBuilder] = await Promise.all([
       docker.pruneContainers().catch(() => ({ ContainersDeleted: [] })),
-      docker.pruneImages({ filters: { dangling: { false: true } } }).catch(() => ({ ImagesDeleted: [] })),
+      docker.pruneImages({ filters: { dangling: { true: true } } }).catch(() => ({ ImagesDeleted: [] })),
       docker.pruneVolumes().catch(() => ({ VolumesDeleted: [] })),
       docker.pruneBuilder().catch(() => null),
     ]);

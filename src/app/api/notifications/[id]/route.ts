@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { dispatchEvent } from "@/lib/notifications/dispatcher";
+import { sendNotificationToChannel } from "@/lib/notifications/dispatcher";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -42,26 +42,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Channel not found" }, { status: 404 });
     }
 
-    // A hack to make it send only to this channel, since dispatcher sends to all matching.
-    // For test, let's just trigger the dispatcher for a special test event, but the requirement is to use the dispatcher.
-    // Alternatively, just manually dispatch here, or if dispatcher is robust, we can just call it and it will broadcast to all enabled for the test event.
-    // Actually, user requested: "Read the channel from DB, use the dispatcher to send a test payload."
-    // Wait, dispatcher sends based on event type to all channels. If we want to send to one specific channel, we should probably just temporarily mock or dispatch a unique event?
-    // Let's implement it the simplest way: call dispatchEvent('test', ...), and the dispatcher handles it. Wait, dispatcher uses event types. 
-    // The requirement says: "Read the channel from DB, use the dispatcher to send a test payload."
-    // If the dispatcher doesn't take channel ID, it will send to all. I'll just dispatch an event and assume the channel has 'test' or it's fine.
-    
-    // Better yet, I can dispatch a generic event. But dispatcher will send to all.
-    // The instructions say "Read the channel from DB, use the dispatcher to send a test payload."
-    await dispatchEvent('test:event', {
+    await sendNotificationToChannel(channel, {
       title: "Test Notification",
-      message: "This is a test notification from Cowbox.",
+      message: `Test message from Cowbox PaaS sent to "${channel.name}" (${channel.channel}).`,
       status: "success",
-      appName: "Cowbox Test"
+      appName: "Cowbox",
+      event: "test:event",
     });
 
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ ok: true, message: `Test notification sent to ${channel.name}` });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to send test notification" }, { status: 500 });
   }
 }

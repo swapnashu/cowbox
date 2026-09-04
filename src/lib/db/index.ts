@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 import * as fs from "fs";
 import * as path from "path";
+import { startBackgroundWorker } from "@/lib/worker";
 
 const dataDir = path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
@@ -27,6 +28,8 @@ export const db = drizzle(client, { schema });
 
 // Auto-run schema initialization for tables if not present
 export async function initializeDatabase() {
+  await client.execute("PRAGMA foreign_keys = ON;");
+
   await client.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -280,4 +283,8 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  try {
+    startBackgroundWorker();
+  } catch (e) {}
 }

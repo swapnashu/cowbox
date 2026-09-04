@@ -21,6 +21,26 @@ export const docker = getDockerClient();
 export const COWBOX_NETWORK = "cowbox-network";
 
 /**
+ * Robust Docker image puller with progress stream resolution
+ */
+export async function pullDockerImage(imageName: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    docker.pull(imageName, (err: any, stream: any) => {
+      if (err) return reject(err);
+      if (!stream) return resolve();
+      docker.modem.followProgress(
+        stream,
+        (progressErr: any) => {
+          if (progressErr) return reject(progressErr);
+          resolve();
+        },
+        () => {}
+      );
+    });
+  });
+}
+
+/**
  * Ensure the internal bridge network exists for inter-container routing & Traefik
  */
 export async function ensureCowboxNetwork(): Promise<string> {
@@ -153,6 +173,7 @@ export async function deployAppContainer(options: {
     const routerName = `${options.applicationId}-${safeDomain}`;
     labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${d.domain}\`)`;
     labels[`traefik.http.routers.${routerName}.entrypoints`] = "web,websecure";
+    labels[`traefik.http.routers.${routerName}.service`] = options.appName;
     if (d.https) {
       labels[`traefik.http.routers.${routerName}.tls`] = "true";
       labels[`traefik.http.routers.${routerName}.tls.certresolver`] = d.certificateResolver || "letsencrypt";
@@ -190,9 +211,10 @@ export async function deployAppContainer(options: {
     portBindings[`${options.containerPort}/tcp`] = [{ HostPort: options.exposedPort.toString() }];
   }
 
+  const safeName = options.appName.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
   const container = await docker.createContainer({
     Image: options.image,
-    name: `cowbox-${options.appName}-${Date.now().toString().slice(-6)}`,
+    name: `cowbox-${safeName}-${Date.now().toString().slice(-6)}`,
     Env: options.envVars,
     Labels: labels,
     HostConfig: {
@@ -229,7 +251,8 @@ export async function deployDatabaseContainer(params: {
   let image = "";
   const env: string[] = [];
   let internalPort = 5432;
-  const volumeName = `cowbox-data-${params.name}`;
+  const safeDbName = params.name.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
+  const volumeName = `cowbox-data-${safeDbName}`;
 
   switch (params.dbType) {
     case "postgres":
@@ -295,14 +318,34 @@ export async function deployDatabaseContainer(params: {
   }
 
   try {
-    await docker.pull(image);
+    await pullDockerImage(image);
   } catch (err) {
-    console.log("Image might already exist or pulling directly...");
+    console.log(`Image ${image} pull notice or already cached:`, err);
+  }
+
+  let mountPath = `/var/lib/${params.dbType}`;
+  switch (params.dbType) {
+    case "postgres":
+      mountPath = "/var/lib/postgresql/data";
+      break;
+    case "mysql":
+    case "mariadb":
+      mountPath = "/var/lib/mysql";
+      break;
+    case "redis":
+      mountPath = "/data";
+      break;
+    case "mongodb":
+      mountPath = "/data/db";
+      break;
+    case "clickhouse":
+      mountPath = "/var/lib/clickhouse";
+      break;
   }
 
   const container = await docker.createContainer({
     Image: image,
-    name: `cowbox-db-${params.name}`,
+    name: `cowbox-db-${safeDbName}`,
     Env: env,
     Labels: {
       "cowbox.managed": "true",
@@ -313,7 +356,7 @@ export async function deployDatabaseContainer(params: {
       NetworkMode: COWBOX_NETWORK,
       PortBindings: portBindings,
       RestartPolicy: { Name: "unless-stopped" },
-      Binds: [`${volumeName}:/var/lib/${params.dbType}/data`],
+      Binds: [`${volumeName}:${mountPath}`],
     },
   });
 

@@ -43,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { SparklineChart } from "@/components/ui/sparkline-chart";
+import { InteractiveTerminal } from "@/components/docker/interactive-terminal";
 import { generateSslipDomain } from "@/lib/domain";
 import { formatBytes } from "@/lib/utils";
 
@@ -65,6 +66,8 @@ export default function ApplicationDetailPage() {
   const [memoryLimit, setMemoryLimit] = useState<string>("");
   const [cpuLimit, setCpuLimit] = useState<string>("");
   const [restartPolicy, setRestartPolicy] = useState<string>("unless-stopped");
+  const [autoDeployEnabled, setAutoDeployEnabled] = useState<boolean>(false);
+  const [isTogglingAutoDeploy, setIsTogglingAutoDeploy] = useState<boolean>(false);
 
   // In-Container Web Terminal State
   const [shellCommand, setShellCommand] = useState("");
@@ -113,6 +116,7 @@ export default function ApplicationDetailPage() {
         setMemoryLimit(data.memoryLimit || "");
         setCpuLimit(data.cpuLimit || "");
         setRestartPolicy(data.restartPolicy || "unless-stopped");
+        setAutoDeployEnabled(Boolean(data.autoDeploy));
 
         if (data.projectId) {
           const dbsRes = await fetch(`/api/databases?projectId=${data.projectId}`);
@@ -254,6 +258,25 @@ export default function ApplicationDetailPage() {
 
     const injected = `\n# Linked Database: ${selectedDb.name} (${selectedDb.type})\nDATABASE_URL=${connUrl}\nDB_HOST=${host}\nDB_PORT=${port}\nDB_USER=${user}\nDB_PASSWORD=${pass}\nDB_NAME=${dbName}\n`;
     setEnvVars((prev) => (prev ? prev.trim() + "\n" + injected : injected.trim()));
+  };
+
+  const handleToggleAutoDeploy = async (enabled: boolean) => {
+    setIsTogglingAutoDeploy(true);
+    try {
+      const res = await fetch(`/api/applications/${appId}/auto-deploy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoDeploy: enabled }),
+      });
+      if (res.ok) {
+        setAutoDeployEnabled(enabled);
+        setApp((prev: any) => ({ ...prev, autoDeploy: enabled }));
+      }
+    } catch (e) {
+      console.error("Failed to toggle auto deploy", e);
+    } finally {
+      setIsTogglingAutoDeploy(false);
+    }
   };
 
   // In-Container Shell Execution
@@ -741,55 +764,7 @@ export default function ApplicationDetailPage() {
 
         {/* In-Container Web Terminal Tab */}
         {activeTab === "terminal" && (
-          <Card className="overflow-hidden bg-slate-950 border-slate-800 shadow-md">
-            <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                <Terminal className="h-4 w-4 text-pink-400" />
-                <span>Interactive Container Shell: <strong>{app.name}</strong></span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShellHistory([])}
-                className="h-7 text-xs gap-1 text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                Clear History
-              </Button>
-            </div>
-
-            <div className="p-4 font-mono text-xs max-h-[420px] overflow-y-auto leading-relaxed terminal-scroll bg-black/60 min-h-[220px] space-y-3">
-              {shellHistory.length === 0 ? (
-                <div className="text-slate-500 italic">
-                  Run commands directly inside this container (e.g. <code>ls -la</code>, <code>env</code>, <code>npm -v</code>, <code>cat package.json</code>)...
-                </div>
-              ) : (
-                shellHistory.map((item, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="text-pink-400 font-bold">$ {item.cmd}</div>
-                    <pre className={`whitespace-pre-wrap ${item.success ? "text-emerald-400" : "text-rose-400"}`}>
-                      {item.out}
-                    </pre>
-                  </div>
-                ))
-              )}
-              <div ref={terminalEndRef} />
-            </div>
-
-            <form onSubmit={handleRunShellCommand} className="p-2.5 bg-slate-900 border-t border-slate-800 flex gap-2">
-              <span className="text-xs font-mono font-bold text-emerald-400 self-center pl-2">$</span>
-              <input
-                type="text"
-                placeholder="Execute command inside container..."
-                value={shellCommand}
-                onChange={(e) => setShellCommand(e.target.value)}
-                disabled={!app.containerId || isExecutingShell}
-                className="flex-1 bg-transparent text-xs font-mono text-slate-100 focus:outline-none placeholder:text-slate-600"
-              />
-              <Button type="submit" isLoading={isExecutingShell} size="sm" variant="success" className="h-8 text-xs font-bold px-3">
-                Run
-              </Button>
-            </form>
-          </Card>
+          <InteractiveTerminal containerId={app.containerId} containerName={app.name} />
         )}
 
         {/* Custom Domains & DNS Configuration Tab */}
@@ -954,29 +929,64 @@ export default function ApplicationDetailPage() {
           <div className="space-y-6">
             <Card className="border-pink-200 bg-gradient-to-r from-pink-50/40 via-white to-white">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <GitBranch className="h-5 w-5 text-pink-600" />
-                  <CardTitle className="text-base font-bold">Continuous Deployment Webhook</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-pink-600" />
+                    <CardTitle className="text-base font-bold">Auto-Deploy Engine & Webhooks</CardTitle>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-600">Auto-Deploy:</span>
+                    <button
+                      type="button"
+                      disabled={isTogglingAutoDeploy}
+                      onClick={() => handleToggleAutoDeploy(!autoDeployEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        autoDeployEnabled ? "bg-pink-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          autoDeployEnabled ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                    <Badge variant={autoDeployEnabled ? "success" : "secondary"} className="text-[10px]">
+                      {autoDeployEnabled ? "Active (Git Polling & Webhook)" : "Disabled"}
+                    </Badge>
+                  </div>
                 </div>
                 <CardDescription>
-                  Automatically trigger deployments when you push commits to GitHub or GitLab.
+                  When enabled, Cowbox automatically watches your Git repository ({app.gitBranch || "main"} branch) and triggers zero-downtime rolling releases on every commit.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    readOnly
-                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/deploy/${app.id}`}
-                    className="font-mono text-xs bg-white text-slate-700"
-                  />
-                  <Button onClick={copyWebhookUrl} size="sm" variant="outline" className="gap-1.5 whitespace-nowrap text-pink-600 border-pink-200 hover:bg-pink-50 font-bold">
-                    {copiedWebhook ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                    {copiedWebhook ? "Copied!" : "Copy Webhook URL"}
-                  </Button>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Continuous Deployment Webhook URL</label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/deploy/${app.id}`}
+                      className="font-mono text-xs bg-white text-slate-700"
+                    />
+                    <Button onClick={copyWebhookUrl} size="sm" variant="outline" className="gap-1.5 whitespace-nowrap text-pink-600 border-pink-200 hover:bg-pink-50 font-bold">
+                      {copiedWebhook ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                      {copiedWebhook ? "Copied!" : "Copy Webhook URL"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Add this URL to your GitHub / GitLab / Gitea repository settings under <strong>Webhooks</strong> with <code>application/json</code> payload.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  Add this URL to your GitHub Repository Settings → Webhooks (Content type: <code>application/json</code>).
-                </p>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Activity className="h-4 w-4 text-pink-500" />
+                    <span>Background Polling Daemon: <strong>Checks for new commits every 60s</strong></span>
+                  </div>
+                  <Badge variant="outline" className="font-mono text-[11px] text-pink-700 border-pink-200">
+                    Branch: {app.gitBranch || "main"}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
 

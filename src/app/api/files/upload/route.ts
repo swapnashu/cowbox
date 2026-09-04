@@ -18,7 +18,12 @@ export async function POST(req: Request) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    const filePath = path.join(targetDir, file.name);
+    const safeFileName = path.basename(file.name);
+    if (!safeFileName || safeFileName === "." || safeFileName === "..") {
+      return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
+    }
+
+    const filePath = resolveSafePath(path.join(targetDirRel, safeFileName));
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -26,8 +31,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Uploaded ${file.name} successfully`,
-      filename: file.name,
+      message: `Uploaded ${safeFileName} successfully`,
+      filename: safeFileName,
       sizeBytes: file.size,
     });
   } catch (error: any) {

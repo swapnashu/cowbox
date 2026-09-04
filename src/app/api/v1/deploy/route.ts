@@ -109,14 +109,6 @@ export async function POST(req: Request) {
 
     // 2. Trigger the deployment engine
     const deployStartTime = Date.now();
-    const deploymentId = crypto.randomUUID();
-
-    await db.insert(deployments).values({
-      id: deploymentId,
-      applicationId: targetApp.id,
-      title: `API Deployment (${auth.keyRecord?.name || "API Key"})`,
-      status: "building",
-    });
 
     // Execute deploy
     const deployUrl = new URL(`/api/applications/${targetApp.id}/deploy`, req.url).toString();
@@ -157,7 +149,8 @@ export async function POST(req: Request) {
         containerPort: targetApp.containerPort,
       },
       deployment: {
-        id: deploymentId,
+        id: deployData.deploymentId,
+        containerId: deployData.containerId,
         durationSeconds,
         status: "running",
       },

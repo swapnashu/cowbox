@@ -171,7 +171,7 @@ export default function DatabasesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {databases.map((db) => {
-            const host = `dekployer-db-${db.name}`;
+            const host = `cowbox-db-${db.name}`;
             const user = db.databaseUser || "postgres";
             const pass = db.rootPassword;
             const port = db.internalPort;

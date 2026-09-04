@@ -16,13 +16,21 @@
 
 ---
 
-## ✨ Features (v0.3.0)
+## ✨ Features (v0.4.0)
 
-### 🚀 Application Deployment
+### 🚀 Application Deployment & Auto-Deploy
 - **Multi-Source Builds**: Deploy from Public Git, Private Git (PAT), Docker Images, Dockerfiles, or .zip Uploads.
+- **Auto-Deploy Engine**: Inbound Git webhooks and a background polling daemon watching remote branches for new commits.
+- **Zero-Downtime Deployments**: Traffic-safe rolling releases with container health probing before Traefik routing cutover.
 - **AI Dockerfile Generator**: Automatically generate optimized, multi-stage Dockerfiles for Next.js, Node, Go, Python, and Static apps using AI.
 - **1-Click Rollbacks**: Instantly revert to any previously successful deployment image tag.
-- **Webhooks**: CI/CD ready — trigger deployments via automatic `git push` webhooks.
+
+### 🐳 Dedicated Docker Management Hub (`/docker`)
+- **Container Control Plane**: View live status, resource metrics, inspect configurations, and start/stop/restart/remove containers.
+- **Image Explorer & Puller**: Inspect local Docker images, layers, sizes, and pull new images from any registry.
+- **Volume & Network Manager**: Manage storage volumes, inspect container attachments, and create bridge networks.
+- **BuildKit Cache Manager**: Inspect builder disk footprint and reclaim gigabytes with 1-click prune.
+- **Interactive Web Terminal**: Run commands directly inside any container with command history, quick presets, and live output.
 
 ### 🐘 Managed Databases
 - **One-Click Provisioning**: PostgreSQL, MySQL, Redis, MongoDB, MariaDB, and ClickHouse.
@@ -30,23 +38,20 @@
 - **Built-in GUIs**: Automatically launch **Adminer** or **Redis Commander** to manage data visually.
 - **Connection SDKs**: Ready-to-use snippets for Prisma, Node.js, Python, and Go.
 
+### 🧩 Docker Compose & Visualizer
+- **Compose Stack Orchestrator**: Deploy multi-service stacks from YAML.
+- **Interactive Topology Visualizer**: Real-time connected graph rendering services, port bindings, networks, and persistent volume attachments.
+
 ### 📊 Monitoring & Telemetry
-- **Live Sparkline Charts**: Historical CPU and RAM usage tracking across the cluster and individual containers.
+- **Live Sparkline Charts**: Background daemon collecting container CPU, RAM, and Network metrics every 30s.
 - **Activity Feed**: Dashboard timeline merging deployment events and security audit logs.
 - **Public Status Page**: A `/status` page with uptime monitors (HTTP/TCP/Container) to show your users everything is operational.
 
 ### 🔐 Security & Access
 - **Full Authentication**: Secure login system with a setup wizard and Edge Middleware session guards.
 - **API Keys**: Generate SHA-256 hashed API keys with scoped permissions for programmatic access.
+- **Hardened Sandboxing**: Zip Slip protection, upload path traversal prevention, and shell injection-safe command dispatchers.
 - **Immutable Audit Logs**: Every API and deployment action is logged and tracked.
-
-### 🛠️ Developer Tools
-- **Web Terminal**: Drop into a live PTY shell inside any running container directly from the browser.
-- **File Manager & Runner**: Edit code in the local workspace and execute Node/Python/Bash scripts in real-time.
-- **Docker Compose Orchestrator**: Paste a `docker-compose.yml` and spin up full stacks instantly.
-- **Cron Automation**: Schedule repeating tasks, backups, and shell commands.
-- **Notification Center**: Real-time alerts sent to Discord, Telegram, Slack, or custom webhooks.
-- **System Doctor**: 1-click cluster auto-healing and dangling volume/image pruning.
 
 ---
 

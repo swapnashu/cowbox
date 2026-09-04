@@ -18,6 +18,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ComposeVisualizer } from "@/components/compose/compose-visualizer";
 
 const COMPOSE_TEMPLATES: Record<string, { title: string; yaml: string }> = {
   fullstack: {
@@ -117,6 +118,7 @@ export default function ComposePage() {
   const [stackName, setStackName] = useState("my-stack");
   const [composeYaml, setComposeYaml] = useState(COMPOSE_TEMPLATES.fullstack.yaml);
   const [envVars, setEnvVars] = useState("");
+  const [activeTab, setActiveTab] = useState<"editor" | "visualizer">("editor");
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployResult, setDeployResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -178,49 +180,79 @@ export default function ComposePage() {
             Orchestrate multi-container architecture from standard <code>docker-compose.yml</code> templates.
           </p>
         </div>
-      </div>
 
-      {/* Preset Stack Selection */}
-      <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs">
-        <span className="font-bold text-slate-700 flex items-center gap-1">
-          <Zap className="h-3.5 w-3.5 text-pink-500" />
-          Stack Presets:
-        </span>
-        {Object.entries(COMPOSE_TEMPLATES).map(([k, v]) => (
+        {/* Tab switch */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
           <button
-            key={k}
             type="button"
-            onClick={() => setComposeYaml(v.yaml)}
-            className="px-2.5 py-1 bg-white hover:bg-pink-50 hover:text-pink-600 rounded-lg border border-slate-200 font-semibold transition-colors shadow-sm"
+            onClick={() => setActiveTab("editor")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "editor"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            + {v.title}
+            YAML Editor
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => setActiveTab("visualizer")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "visualizer"
+                ? "bg-white text-pink-600 shadow-sm"
+                : "text-slate-600 hover:text-pink-600"
+            }`}
+          >
+            Topology Visualizer
+          </button>
+        </div>
       </div>
 
-      {/* Deploy Status Toast */}
-      {deployResult && (
-        <div
-          className={`p-4 rounded-xl text-xs font-bold flex items-start gap-2 border ${
-            deployResult.success
-              ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-              : "bg-rose-50 border-rose-300 text-rose-800"
-          }`}
-        >
-          <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <div>
-            <div>{deployResult.message || deployResult.error}</div>
-            {deployResult.services && (
-              <div className="mt-1 font-mono font-normal text-[11px] text-emerald-700">
-                Active Services: {deployResult.services.join(", ")}
-              </div>
-            )}
+      {activeTab === "visualizer" ? (
+        <ComposeVisualizer composeYaml={composeYaml} />
+      ) : (
+        <>
+          {/* Preset Stack Selection */}
+          <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs">
+            <span className="font-bold text-slate-700 flex items-center gap-1">
+              <Zap className="h-3.5 w-3.5 text-pink-500" />
+              Stack Presets:
+            </span>
+            {Object.entries(COMPOSE_TEMPLATES).map(([k, v]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setComposeYaml(v.yaml)}
+                className="px-2.5 py-1 bg-white hover:bg-pink-50 hover:text-pink-600 rounded-lg border border-slate-200 font-semibold transition-colors shadow-sm"
+              >
+                + {v.title}
+              </button>
+            ))}
           </div>
-        </div>
-      )}
 
-      {/* Compose Editor Grid */}
-      <form onSubmit={handleDeployStack} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Deploy Status Toast */}
+          {deployResult && (
+            <div
+              className={`p-4 rounded-xl text-xs font-bold flex items-start gap-2 border ${
+                deployResult.success
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                  : "bg-rose-50 border-rose-300 text-rose-800"
+              }`}
+            >
+              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <div>{deployResult.message || deployResult.error}</div>
+                {deployResult.services && (
+                  <div className="mt-1 font-mono font-normal text-[11px] text-emerald-700">
+                    Active Services: {deployResult.services.join(", ")}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Compose Editor Grid */}
+          <form onSubmit={handleDeployStack} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <Card className="lg:col-span-8 flex flex-col shadow-sm">
           <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
             <div>
@@ -285,6 +317,8 @@ export default function ComposePage() {
           </Card>
         </div>
       </form>
+      </>
+      )}
     </div>
   );
 }
