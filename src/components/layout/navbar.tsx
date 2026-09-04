@@ -15,12 +15,15 @@ import {
   Layers,
   HardDrive,
   Cpu,
+  ArrowUpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatBytes } from "@/lib/utils";
+
 export function Navbar() {
   const [stats, setStats] = useState<any>(null);
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchStatus = async () => {
@@ -32,10 +35,24 @@ export function Navbar() {
     } catch (e) {}
   };
 
+  const checkUpdates = async () => {
+    try {
+      const res = await fetch("/api/system/updates");
+      if (res.ok) {
+        setUpdateInfo(await res.json());
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     fetchStatus();
+    checkUpdates();
     const interval = setInterval(fetchStatus, 10000);
-    return () => clearInterval(interval);
+    const updateInterval = setInterval(checkUpdates, 60000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(updateInterval);
+    };
   }, []);
 
   const serverIp = stats?.serverIp || "127.0.0.1";
@@ -93,10 +110,20 @@ export function Navbar() {
         )}
 
         {/* Traefik Status */}
-        <div className="flex items-center gap-1.5 bg-emerald-50  px-2.5 py-1.5 rounded-xl border border-emerald-200  text-xs text-emerald-800  font-bold">
-          <ShieldCheck className="h-4 w-4 text-emerald-600 " />
+        <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200 text-xs text-emerald-800 font-bold">
+          <ShieldCheck className="h-4 w-4 text-emerald-600" />
           <span className="hidden sm:inline">Traefik SSL</span>
         </div>
+
+        {/* Update Available Notification Badge */}
+        {updateInfo?.hasUpdate && (
+          <Link href="/master#updates">
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-rose-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 animate-pulse hover:opacity-95 transition-opacity cursor-pointer">
+              <ArrowUpCircle className="h-3.5 w-3.5" />
+              <span>Update v{updateInfo.latestVersion}</span>
+            </div>
+          </Link>
+        )}
 
         {/* Templates Quick Launch */}
         <Link href="/templates">

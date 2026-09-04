@@ -2,9 +2,12 @@ import argparse
 import subprocess
 import sys
 import os
+import json
 import secrets
 import tempfile
 import shutil
+import urllib.request
+from . import __version__
 
 def check_docker():
     try:
@@ -13,11 +16,49 @@ def check_docker():
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
+def parse_semver(v):
+    cleaned = v.lstrip("vV").strip()
+    parts = []
+    for part in cleaned.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    while len(parts) < 3:
+        parts.append(0)
+    return parts[:3]
+
+def check_for_updates():
+    try:
+        req = urllib.request.Request(
+            "https://pypi.org/pypi/cowbox/json",
+            headers={"User-Agent": f"cowbox-cli/{__version__}"}
+        )
+        with urllib.request.urlopen(req, timeout=2.5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                latest_version = data.get("info", {}).get("version", __version__)
+                if parse_semver(latest_version) > parse_semver(__version__):
+                    return True, latest_version
+    except Exception:
+        pass
+    return False, __version__
+
+def print_update_banner_if_available():
+    has_update, latest_ver = check_for_updates()
+    if has_update:
+        print("\n" + "─" * 55)
+        print(f" ✨ Cowbox Update Available! v{__version__} ➜ v{latest_ver}")
+        print(f" Run: pip install --upgrade cowbox && cowbox restart")
+        print(f" PyPI: https://pypi.org/project/cowbox/{latest_ver}/")
+        print("─" * 55 + "\n")
+
 def main():
     parser = argparse.ArgumentParser(
         prog="cowbox",
-        description="Cowbox CLI - Self-Hosted PaaS Management Hub"
+        description=f"Cowbox CLI (v{__version__}) - Self-Hosted PaaS Management Hub"
     )
+    parser.add_argument("-v", "--version", action="version", version=f"Cowbox v{__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # START command
@@ -42,7 +83,10 @@ def main():
     subparsers.add_parser("restart", help="Restart the Cowbox server")
 
     # STATUS command
-    subparsers.add_parser("status", help="Show Cowbox server status")
+    subparsers.add_parser("status", help="Show Cowbox server status and check for updates")
+
+    # UPDATE command
+    subparsers.add_parser("update", help="Check and upgrade Cowbox to the latest version")
 
     # LOGS command
     logs_parser = subparsers.add_parser("logs", help="View Cowbox server logs")
@@ -55,6 +99,8 @@ def main():
         if not check_docker():
             print("❌ Error: Docker is not running or not installed. Cowbox requires Docker.")
             sys.exit(1)
+
+        print_update_banner_if_available()
 
         email = args.email
         password = args.password
@@ -142,9 +188,29 @@ def main():
             print("❌ Cowbox is not running or failed to restart.")
 
     elif args.command == "status":
+        print(f"🐮 Cowbox CLI v{__version__}")
         res = subprocess.run(["docker", "ps", "--filter", "name=cowbox-server", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"])
         if res.returncode != 0:
             print("❌ Failed to query Docker status.")
+        print_update_banner_if_available()
+
+    elif args.command == "update":
+        print("🔍 Checking for Cowbox updates on PyPI...")
+        has_update, latest_ver = check_for_updates()
+        if not has_update:
+            print(f"✅ Cowbox is already up to date (v{__version__}).")
+            sys.exit(0)
+
+        print(f"🚀 New version found: v{__version__} ➜ v{latest_ver}")
+        print("Upgrading Python package...")
+        res = subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "cowbox"])
+        if res.returncode != 0:
+            print("❌ Failed to upgrade python package.")
+            sys.exit(1)
+
+        print(f"✅ Upgraded to Cowbox v{latest_ver}!")
+        print("To restart the server with the latest release, run:")
+        print("  cowbox start")
 
     elif args.command == "logs":
         cmd = ["docker", "logs", "--tail", args.lines]

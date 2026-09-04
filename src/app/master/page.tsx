@@ -7,10 +7,17 @@ import {
   Activity,
   MemoryStick,
   Play,
-  Square,
   RotateCw,
+  Square,
   Search,
-  HardDrive
+  HardDrive,
+  ArrowUpCircle,
+  CheckCircle2,
+  ExternalLink,
+  Sparkles,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,14 +27,18 @@ import { Badge } from "@/components/ui/badge";
 export default function MasterPanelPage() {
   const [status, setStatus] = useState<any>(null);
   const [containers, setContainers] = useState<any[]>([]);
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [copiedCmd, setCopiedCmd] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const fetchData = async () => {
     try {
-      const [statusRes, containersRes] = await Promise.all([
+      const [statusRes, containersRes, updatesRes] = await Promise.all([
         fetch("/api/server/status"),
-        fetch("/api/containers")
+        fetch("/api/containers"),
+        fetch("/api/system/updates"),
       ]);
       if (statusRes.ok) {
         setStatus(await statusRes.json());
@@ -36,11 +47,34 @@ export default function MasterPanelPage() {
         const cData = await containersRes.json();
         setContainers(cData.containers || []);
       }
+      if (updatesRes.ok) {
+        setUpdateInfo(await updatesRes.json());
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleManualCheck = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const res = await fetch("/api/system/updates?force=true");
+      if (res.ok) {
+        setUpdateInfo(await res.json());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCmd(true);
+    setTimeout(() => setCopiedCmd(false), 2000);
   };
 
   useEffect(() => {
@@ -146,6 +180,149 @@ export default function MasterPanelPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Auto-Update & Release Management Hub */}
+      <Card id="updates" className="border border-slate-200/90 shadow-sm overflow-hidden">
+        <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-pink-500/10 text-pink-600 flex items-center justify-center">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                Cowbox Release & Update Center
+                {updateInfo?.hasUpdate ? (
+                  <Badge variant="warning" className="text-[10px] uppercase font-bold animate-pulse">
+                    Update Available
+                  </Badge>
+                ) : (
+                  <Badge variant="success" className="text-[10px] uppercase font-bold">
+                    Up to Date
+                  </Badge>
+                )}
+              </CardTitle>
+              <p className="text-xs text-slate-500">
+                Automated continuous update checker syncing with PyPI & GitHub
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleManualCheck}
+            disabled={isCheckingUpdate}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isCheckingUpdate ? "animate-spin" : ""}`} />
+            {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Installed Version */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Installed Version
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black font-mono text-slate-800">
+                  v{updateInfo?.currentVersion || "0.2.1"}
+                </span>
+                <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 font-medium">
+                  Active
+                </span>
+              </div>
+            </div>
+
+            {/* PyPI Version */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Latest on PyPI
+              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-black font-mono text-pink-600">
+                  v{updateInfo?.pypi?.version || "0.2.1"}
+                </span>
+                <a
+                  href={updateInfo?.pypi?.url || "https://pypi.org/project/cowbox/"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-slate-500 hover:text-pink-600 flex items-center gap-1 font-medium"
+                >
+                  PyPI <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+
+            {/* GitHub Release */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Latest on GitHub
+              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-black font-mono text-emerald-600">
+                  v{updateInfo?.github?.version || "0.2.1"}
+                </span>
+                <a
+                  href={updateInfo?.github?.url || "https://github.com/swapnashu/cowbox"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-slate-500 hover:text-emerald-600 flex items-center gap-1 font-medium"
+                >
+                  GitHub <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Update Available Box */}
+          {updateInfo?.hasUpdate ? (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-900 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ArrowUpCircle className="h-5 w-5 text-amber-600" />
+                  <span className="font-bold text-sm">
+                    New version v{updateInfo.latestVersion} is available!
+                  </span>
+                </div>
+                <span className="text-xs text-amber-700 font-medium">
+                  {updateInfo.pypi.publishedAt
+                    ? `Released ${new Date(updateInfo.pypi.publishedAt).toLocaleDateString()}`
+                    : ""}
+                </span>
+              </div>
+
+              {/* Upgrade Command snippet */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-amber-800">
+                  Upgrade your Cowbox instance:
+                </span>
+                <div className="flex items-center justify-between bg-slate-900 text-slate-100 p-2.5 rounded-lg font-mono text-xs shadow-inner">
+                  <code className="text-pink-400">
+                    {updateInfo.instructions.pip}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => copyToClipboard(updateInfo.instructions.pip)}
+                    className="h-6 px-2 text-[10px] text-slate-300 hover:text-white hover:bg-slate-800"
+                  >
+                    {copiedCmd ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    {copiedCmd ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+              <span>
+                Your Cowbox cluster is currently running the latest official version (v{updateInfo?.currentVersion || "0.2.1"}).
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Middle Section: Dense Container Table */}
       <Card>

@@ -6,8 +6,11 @@ import { docker } from "@/lib/docker";
 import crypto from "crypto";
 import { exec } from "child_process";
 import net from "net";
+import { checkForUpdates } from "@/lib/updater";
+import { dispatchEvent } from "@/lib/notifications/dispatcher";
 
 export let workerStarted = false;
+let lastNotifiedUpdateVersion = "";
 const activeScheduledTasks = new Map<string, ScheduledTask>();
 
 async function checkHttp(url: string, expectedStatus: number): Promise<{ isUp: boolean; time: number }> {
@@ -266,18 +269,40 @@ export async function collectContainerMetrics() {
   } catch (err) {}
 }
 
+export async function checkAutoUpdates() {
+  try {
+    const updateInfo = await checkForUpdates(false);
+    if (updateInfo.hasUpdate && updateInfo.latestVersion !== lastNotifiedUpdateVersion) {
+      lastNotifiedUpdateVersion = updateInfo.latestVersion;
+      console.log(
+        `🚀 [Cowbox Auto-Updater] New version v${updateInfo.latestVersion} is available (running v${updateInfo.currentVersion})! PyPI: ${updateInfo.pypi.url}`
+      );
+
+      // Dispatch alert to configured webhook channels (Discord, Slack, Telegram, Webhook)
+      await dispatchEvent("system:update_available", {
+        title: `🚀 Cowbox Update Available: v${updateInfo.latestVersion}`,
+        message: `Cowbox v${updateInfo.latestVersion} is now available (current: v${updateInfo.currentVersion}). Upgrade via: ${updateInfo.instructions.pip}`,
+        status: "warning",
+      });
+    }
+  } catch (err) {
+    // Ignore network errors during background update check
+  }
+}
+
 export function startBackgroundWorker() {
   if (workerStarted) return;
   if (typeof window !== "undefined") return; // Only run on server
 
   workerStarted = true;
-  console.log("🚀 [Cowbox Daemon] Starting Background Worker (Cron, Metrics, Git Auto-Deploy & Status Monitors)...");
+  console.log("🚀 [Cowbox Daemon] Starting Background Worker (Cron, Metrics, Git Auto-Deploy, Status Monitors & Auto-Update Checker)...");
 
   // Run initial tasks
   runStatusChecks();
   syncCronJobs();
   pollGitAutoDeploy();
   collectContainerMetrics();
+  checkAutoUpdates();
 
   // Run status checks every 60 seconds
   setInterval(() => {
@@ -298,4 +323,10 @@ export function startBackgroundWorker() {
   setInterval(() => {
     collectContainerMetrics();
   }, 30000);
+
+  // Check for updates every 2 hours
+  setInterval(() => {
+    checkAutoUpdates();
+  }, 2 * 60 * 60 * 1000);
 }
+
