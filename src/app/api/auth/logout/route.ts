@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, initializeDatabase } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { clearSessionCookie, getSessionToken } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
+    await initializeDatabase();
     const token = getSessionToken(req);
 
     if (token) {

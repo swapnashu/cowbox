@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { sessions } from "@/lib/db/schema";
+import { db, initializeDatabase } from "@/lib/db";
+import { users, sessions } from "@/lib/db/schema";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { createSessionCookie, generateSessionToken } from "@/lib/auth/session";
 
 export async function GET(req: NextRequest) {
   try {
+    await initializeDatabase();
     const allUsers = await db.select().from(users).limit(1);
     const needsSetup = allUsers.length === 0;
     return NextResponse.json({ needsSetup });
-  } catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("[Setup GET Error]:", error);
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    await initializeDatabase();
     const allUsers = await db.select().from(users).limit(1);
     if (allUsers.length > 0) {
       return NextResponse.json({ error: "Forbidden. Setup already complete." }, { status: 403 });

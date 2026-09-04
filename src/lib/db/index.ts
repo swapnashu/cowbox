@@ -3,7 +3,6 @@ import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 import * as fs from "fs";
 import * as path from "path";
-import { startBackgroundWorker } from "@/lib/worker";
 
 const dataDir = path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
@@ -283,8 +282,4 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
-
-  try {
-    startBackgroundWorker();
-  } catch (e) {}
 }

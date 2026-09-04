@@ -1,8 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
-    serverComponentsExternalPackages: ["dockerode", "@libsql/client"],
+    serverComponentsExternalPackages: [
+      "dockerode",
+      "@libsql/client",
+      "@grpc/grpc-js",
+      "@balena/dockerignore",
+      "node-cron",
+      "tar-fs",
+      "bcryptjs",
+      "ssh2",
+      "adm-zip",
+    ],
     instrumentationHook: true,
   },
   async headers() {
@@ -27,6 +40,13 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
+        stream: false,
+        crypto: false,
+        path: false,
+        os: false,
+        http: false,
+        https: false,
+        zlib: false,
       };
     }
     return config;

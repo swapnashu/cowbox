@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, initializeDatabase } from "@/lib/db";
 import { users, sessions } from "@/lib/db/schema";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -8,6 +8,7 @@ import { createSessionCookie, generateSessionToken } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
+    await initializeDatabase();
     const { email, password } = await req.json();
     if (!email || !password) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });

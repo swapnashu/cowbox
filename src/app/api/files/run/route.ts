@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { resolveSafePath, WORKSPACE_ROOT } from "@/lib/workspace";
 import { exec } from "child_process";
 import * as path from "path";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
+  const auth = await requireAuth(req, "full_access");
+  if (!auth.authenticated) {
+    return auth.response;
+  }
+
   const startTime = Date.now();
   try {
     const { filePath, command } = await req.json();

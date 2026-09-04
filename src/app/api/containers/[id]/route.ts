@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await requireAuth(req, "containers:read");
+  if (!auth.authenticated) {
+    return auth.response;
+  }
+
   try {
     const container = docker.getContainer(params.id);
     const data = await container.inspect();
@@ -51,6 +57,11 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await requireAuth(req, "containers:write");
+  if (!auth.authenticated) {
+    return auth.response;
+  }
+
   try {
     const { action } = await req.json();
     const container = docker.getContainer(params.id);

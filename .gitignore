@@ -31,3 +31,8 @@ data/
 *.sqlite
 *.sqlite-journal
 *.db
+
+# Python build artifacts
+python-pkg/dist/
+python-pkg/build/
+python-pkg/*.egg-info/

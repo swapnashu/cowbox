@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await requireAuth(req, "full_access");
+  if (!auth.authenticated) {
+    return auth.response;
+  }
+
   try {
     const { command = "sh", args = [] } = await req.json();
     const container = docker.getContainer(params.id);
