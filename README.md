@@ -3,6 +3,7 @@
 > **Cowbox** is an open-source, self-hosted Platform-as-a-Service (PaaS) and container control plane alternative to **Dokploy**, **Coolify**, and **Easypanel**. Deploy and manage applications, databases, Docker Compose stacks, and wildcard `sslip.io` SSL routing instantly on port **9999**.
 
 ![Cowbox Status](https://img.shields.io/badge/Status-Beta-emerald?style=flat-square)
+![PyPI Version](https://img.shields.io/pypi/v/cowbox?style=flat-square&color=pink)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
 ### 📸 Dashboard Overview
@@ -16,7 +17,7 @@
 
 ---
 
-## ✨ Features (v0.4.0)
+## ✨ Features (v0.2.1)
 
 ### 🚀 Application Deployment & Auto-Deploy
 - **Multi-Source Builds**: Deploy from Public Git, Private Git (PAT), Docker Images, Dockerfiles, or .zip Uploads.

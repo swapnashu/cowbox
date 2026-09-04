@@ -20,6 +20,7 @@ import {
   Terminal,
   ShieldCheck,
 } from "lucide-react";
+import { COWBOX_VERSION } from "@/lib/version";
 
 export function CommandPalette() {
   const router = useRouter();
@@ -174,7 +175,7 @@ export function CommandPalette() {
               Save File
             </span>
           </div>
-          <span className="text-pink-600 font-bold">Cowbox v0.1.0</span>
+          <span className="text-pink-600 font-bold">Cowbox v{COWBOX_VERSION}</span>
         </div>
       </div>
     </div>

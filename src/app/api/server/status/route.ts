@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkDockerConnection, docker } from "@/lib/docker";
 import { initializeDatabase } from "@/lib/db";
+import { COWBOX_VERSION } from "@/lib/version";
 import os from "os";
 import * as fs from "fs";
 
@@ -71,6 +72,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      cowboxVersion: COWBOX_VERSION,
       connected: dockerStatus.connected,
       version: dockerStatus.version,
       containers: totalContainers,

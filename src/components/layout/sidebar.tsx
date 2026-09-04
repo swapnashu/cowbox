@@ -20,6 +20,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COWBOX_VERSION } from "@/lib/version";
 
 const navigationGroups = [
   {
@@ -124,8 +125,8 @@ export function Sidebar() {
             </span>
             <span className="text-slate-800  font-semibold">Cowbox Cluster</span>
           </div>
-          <span className="text-[11px] text-emerald-600  font-mono font-medium bg-emerald-50  px-2 py-0.5 rounded-md border border-emerald-200 ">
-            v0.1.0
+          <span className="text-[11px] text-emerald-600 font-mono font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+            v{COWBOX_VERSION}
           </span>
         </div>
       </div>
