@@ -9,6 +9,24 @@ import shutil
 import urllib.request
 from . import __version__
 
+SYSTEMD_UNIT_TEMPLATE = """[Unit]
+Description=Cowbox PaaS Management Hub
+Documentation=https://github.com/swapnashu/cowbox
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker start cowbox-server
+ExecStop=/usr/bin/docker stop -t 15 cowbox-server
+ExecReload=/usr/bin/docker restart cowbox-server
+
+[Install]
+WantedBy=multi-user.target
+"""
+
 def check_docker():
     try:
         subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -53,6 +71,50 @@ def print_update_banner_if_available():
         print(f" PyPI: https://pypi.org/project/cowbox/{latest_ver}/")
         print("─" * 55 + "\n")
 
+def manage_service(action):
+    service_file = "/etc/systemd/system/cowbox.service"
+    
+    if action == "install":
+        print("📦 Installing Cowbox systemd autostart service...")
+        if os.name == "nt":
+            print("❌ Error: systemd is only supported on Linux distributions.")
+            sys.exit(1)
+        
+        try:
+            with open(service_file, "w") as f:
+                f.write(SYSTEMD_UNIT_TEMPLATE)
+            
+            subprocess.run(["systemctl", "daemon-reload"], check=True)
+            subprocess.run(["systemctl", "enable", "cowbox.service"], check=True)
+            print("✅ cowbox.service installed and enabled to autostart on system boot!")
+            print("To start the service now: systemctl start cowbox.service")
+        except PermissionError:
+            print("❌ Permission denied. Please run with sudo: sudo cowbox service install")
+            sys.exit(1)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to enable service: {e}")
+            sys.exit(1)
+
+    elif action == "status":
+        if os.name == "nt":
+            print("❌ Error: systemd is only supported on Linux distributions.")
+            sys.exit(1)
+        subprocess.run(["systemctl", "status", "cowbox.service"])
+
+    elif action == "uninstall":
+        if os.name == "nt":
+            print("❌ Error: systemd is only supported on Linux distributions.")
+            sys.exit(1)
+        try:
+            subprocess.run(["systemctl", "disable", "cowbox.service"], check=False)
+            if os.path.exists(service_file):
+                os.remove(service_file)
+            subprocess.run(["systemctl", "daemon-reload"], check=True)
+            print("✅ cowbox.service successfully uninstalled.")
+        except PermissionError:
+            print("❌ Permission denied. Please run with sudo: sudo cowbox service uninstall")
+            sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(
         prog="cowbox",
@@ -69,6 +131,8 @@ def main():
                               help="Administrator email (or COWBOX_ADMIN_EMAIL env)")
     start_parser.add_argument("--password", type=str, default=os.getenv("COWBOX_ADMIN_PASSWORD", os.getenv("ADMIN_PASSWORD", "")),
                               help="Administrator password (or COWBOX_ADMIN_PASSWORD env)")
+    start_parser.add_argument("-d", "--data-dir", type=str, default=os.getenv("COWBOX_DATA_DIR", os.getenv("DATA_DIR", "")),
+                              help="Host path for persistent DB & storage volume (e.g. /var/lib/cowbox)")
     start_parser.add_argument("--letsencrypt-email", type=str, default=os.getenv("LETSENCRYPT_EMAIL", ""),
                               help="Let's Encrypt notification email for SSL certificates")
     start_parser.add_argument("--restart", type=str, default="unless-stopped",
@@ -87,6 +151,11 @@ def main():
 
     # UPDATE command
     subparsers.add_parser("update", help="Check and upgrade Cowbox to the latest version")
+
+    # SERVICE command (systemd autostart)
+    service_parser = subparsers.add_parser("service", help="Manage systemd autostart service")
+    service_parser.add_argument("action", choices=["install", "status", "uninstall"],
+                                help="Service action (install, status, uninstall)")
 
     # LOGS command
     logs_parser = subparsers.add_parser("logs", help="View Cowbox server logs")
@@ -135,10 +204,18 @@ def main():
             print("Building Docker image (this may take a few minutes on first run)...")
             subprocess.run(["docker", "build", "-t", "cowbox:latest", temp_dir], check=True)
 
-            print("\nStarting container with restart policy:", args.restart)
+            print(f"\nStarting container with restart policy: {args.restart}")
 
             # Ensure container isn't already running
             subprocess.run(["docker", "rm", "-f", "cowbox-server"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            # Resolve stable persistent volume
+            if args.data_dir:
+                abs_data_dir = os.path.abspath(args.data_dir)
+                os.makedirs(abs_data_dir, exist_ok=True)
+                volume_mapping = f"{abs_data_dir}:/app/data"
+            else:
+                volume_mapping = "cowbox-data:/app/data"
 
             run_cmd = [
                 "docker", "run", "-d",
@@ -146,7 +223,8 @@ def main():
                 "--restart", args.restart,
                 "-p", f"{port}:9999",
                 "-v", "/var/run/docker.sock:/var/run/docker.sock",
-                "-v", "cowbox-data:/app/data",
+                "-v", volume_mapping,
+                "-e", "COWBOX_DATA_DIR=/app/data",
                 "-e", f"ADMIN_EMAIL={email}",
                 "-e", f"ADMIN_PASSWORD={password}",
             ]
@@ -162,6 +240,7 @@ def main():
             print(f"🔗 Dashboard: http://localhost:{port}")
             print(f"📧 Admin Email:    {email}")
             print(f"🔑 Admin Password: {password}")
+            print(f"💾 Persistent DB:  {volume_mapping}")
             print("=" * 50)
             print("Tip: Use 'cowbox logs -f' to view live logs or 'cowbox stop' to stop.")
 
@@ -170,6 +249,9 @@ def main():
             sys.exit(1)
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    elif args.command == "service":
+        manage_service(args.action)
 
     elif args.command == "stop":
         print("Stopping Cowbox...")

@@ -91,14 +91,34 @@ To deploy Cowbox on a remote VPS (Ubuntu/Debian recommended):
 # 1. Build the image
 docker build -t cowbox:latest .
 
-# 2. Run the container
+# 2. Run the container with persistent volume
 docker run -d \
   -p 9999:9999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v cowbox-data:/app/data \
-  --name cowbox \
+  --name cowbox-server \
   --restart unless-stopped \
   cowbox:latest
+```
+
+---
+
+## ⚡ Autostart on System Boot (Linux systemd)
+
+To make sure Cowbox automatically resumes after VPS reboots:
+
+```bash
+# Automatically install & enable systemd service via CLI:
+sudo cowbox service install
+
+# Check status:
+sudo cowbox service status
+```
+
+Or manually copy [cowbox.service](file:///d:/dekployerxx/cowbox.service) to `/etc/systemd/system/cowbox.service` and run:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now cowbox.service
 ```
 
 ---

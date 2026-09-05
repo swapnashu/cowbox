@@ -4,14 +4,14 @@ import * as schema from "./schema";
 import * as fs from "fs";
 import * as path from "path";
 
-const dataDir = path.join(process.cwd(), "data");
+const dataDir = process.env.COWBOX_DATA_DIR || process.env.DATA_DIR || path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
 // Support seamless migration from dekployer.db to cowbox.db if existing
 const oldDbPath = path.join(dataDir, "dekployer.db");
-const dbPath = path.join(dataDir, "cowbox.db");
+const dbPath = process.env.DATABASE_PATH || path.join(dataDir, "cowbox.db");
 
 if (fs.existsSync(oldDbPath) && !fs.existsSync(dbPath)) {
   try {
@@ -20,14 +20,17 @@ if (fs.existsSync(oldDbPath) && !fs.existsSync(dbPath)) {
 }
 
 const client = createClient({
-  url: `file:${dbPath}`,
+  url: process.env.DATABASE_URL || `file:${dbPath}`,
 });
 
 export const db = drizzle(client, { schema });
 
 // Auto-run schema initialization for tables if not present
 export async function initializeDatabase() {
+  await client.execute("PRAGMA journal_mode = WAL;");
+  await client.execute("PRAGMA synchronous = NORMAL;");
   await client.execute("PRAGMA foreign_keys = ON;");
+  await client.execute("PRAGMA busy_timeout = 5000;");
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS users (
