@@ -32,10 +32,12 @@ import {
   Sparkles,
   Download,
   Upload,
-  Cpu,
   HardDrive,
   Activity,
   Zap,
+  Pause,
+  AlignLeft,
+  Eraser,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,6 +89,8 @@ export default function ApplicationDetailPage() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [logSearch, setLogSearch] = useState("");
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [wordWrap, setWordWrap] = useState(true);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +104,8 @@ export default function ApplicationDetailPage() {
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+  useEffect(() => { autoScrollRef.current = autoScroll; }, [autoScroll]);
 
   const fetchApp = async () => {
     try {
@@ -175,7 +181,7 @@ export default function ApplicationDetailPage() {
           const newLogs = [...prev, event.data];
           // auto scroll
           setTimeout(() => {
-            logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            if (autoScrollRef.current) logsEndRef.current?.scrollIntoView({ behavior: "auto" });
           }, 50);
           return newLogs;
         });
@@ -1055,41 +1061,83 @@ export default function ApplicationDetailPage() {
           </div>
         )}
 
-        {/* Logs Tab */}
+                {/* Logs Tab */}
         {activeTab === "logs" && (
           <Card className="overflow-hidden bg-slate-950 border-slate-800 shadow-md">
             <div className="p-3 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                <Terminal className="h-4 w-4 text-pink-400" />
-                <span>stdout & stderr logs</span>
+              <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-300">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Terminal className="h-4 w-4 text-pink-400" />
+                  <span>stdout & stderr</span>
+                </div>
+                <div className="flex items-center gap-1 bg-slate-950/50 rounded-md p-0.5 border border-slate-800">
+                  <Button variant="ghost" size="sm" onClick={() => setAutoScroll(!autoScroll)} className={`h-6 px-2 text-[10px] gap-1.5 rounded-sm transition-colors ${autoScroll ? "bg-slate-800 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"}`}>
+                    {autoScroll ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                    {autoScroll ? "Pause Scroll" : "Resume"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setWordWrap(!wordWrap)} className={`h-6 px-2 text-[10px] gap-1.5 rounded-sm transition-colors ${wordWrap ? "bg-slate-800 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"}`}>
+                    <AlignLeft className="h-3 w-3" />
+                    Wrap
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setLogs([])} className="h-6 px-2 text-[10px] gap-1.5 rounded-sm text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors">
+                    <Eraser className="h-3 w-3" />
+                    Clear
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Filter logs (e.g. error, warn)..."
-                  value={logSearch}
-                  onChange={(e) => setLogSearch(e.target.value)}
-                  className="h-7 px-2.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none placeholder:text-slate-500 font-mono w-48"
-                />
-                <Button variant="ghost" size="sm" onClick={handleDownloadLogs} className="h-7 text-xs gap-1 text-slate-300 hover:text-white hover:bg-slate-800 font-medium">
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Filter logs (e.g. error, warn)..."
+                    value={logSearch}
+                    onChange={(e) => setLogSearch(e.target.value)}
+                    className="h-7 pl-8 pr-2.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/30 placeholder:text-slate-500 font-mono w-56 transition-all shadow-inner"
+                  />
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleDownloadLogs} className="h-7 text-xs gap-1.5 text-slate-300 hover:text-white hover:bg-slate-800 font-medium rounded-lg border border-slate-800">
                   <Download className="h-3.5 w-3.5" />
                   Download
                 </Button>
               </div>
             </div>
-            <div className="p-4 font-mono text-xs text-emerald-400 whitespace-pre-wrap max-h-[500px] overflow-y-auto leading-relaxed terminal-scroll bg-black/60">
-              {logSearch
-                ? logs
-                    .filter((l) => l.toLowerCase().includes(logSearch.toLowerCase()))
-                    .join("\n") || `No log lines matching "${logSearch}"`
-                : logs.join("\n")}
-              <div ref={logsEndRef} />
+            <div className={`p-4 font-mono text-xs max-h-[600px] overflow-y-auto leading-relaxed terminal-scroll bg-black/90 ${wordWrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"}`}>
+              {(() => {
+                const filtered = logSearch
+                  ? logs.filter((l) => l.toLowerCase().includes(logSearch.toLowerCase()))
+                  : logs;
+                  
+                if (filtered.length === 0) {
+                  return <div className="text-slate-500 italic py-2 text-center w-full">No log lines available.</div>;
+                }
+                
+                return filtered.map((l, i) => {
+                  let colorClass = "text-slate-300";
+                  const lowerLine = l.toLowerCase();
+                  if (lowerLine.includes("error") || lowerLine.includes("fail") || lowerLine.includes("exception")) {
+                    colorClass = "text-rose-400 font-bold";
+                  } else if (lowerLine.includes("warn")) {
+                    colorClass = "text-amber-300";
+                  } else if (lowerLine.includes("info") || lowerLine.includes("success")) {
+                    colorClass = "text-emerald-300";
+                  }
+                  
+                  return (
+                    <div key={i} className={`hover:bg-white/5 px-1.5 py-[1px] rounded-[2px] transition-colors ${colorClass}`}>
+                      {l}
+                    </div>
+                  );
+                });
+              })()}
+              <div ref={logsEndRef} className="h-4" />
             </div>
           </Card>
         )}
 
-        {/* Environment Variables & DB Linking Tab */}
+
+          {/* Environment Variables & DB Linking Tab */}
         {activeTab === "env" && (
           <div className="space-y-6">
             {projectDbs.length > 0 && (
