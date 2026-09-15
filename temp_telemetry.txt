@@ -1,0 +1,90 @@
+          <Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  <CardTitle className="text-sm font-bold text-slate-800">Advanced Hardware & Network Telemetry</CardTitle>
+                </div>
+                <Badge variant="outline" className="text-[11px] font-mono text-slate-600 bg-white">
+                  Host: {stats.system.hostname} ({stats.system.platform})
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
+              <div>
+                <div className="flex justify-between font-semibold text-slate-700 mb-1">
+                  <span className="flex items-center gap-1.5"><Cpu className="h-3.5 w-3.5 text-slate-400" /> CPU Processor</span>
+                  <span className="text-emerald-600 font-bold">{stats.system.cpuCount} Cores</span>
+                </div>
+                <p className="text-[10px] text-slate-400 truncate font-mono mb-2">{stats.system.cpuModel}</p>
+                <div className="mt-1 h-12 bg-slate-50 rounded-lg p-1 border border-slate-100">
+                  <SparklineChart data={metricsHistory.map(m => parseFloat(m.cpuPercent) || 0)} color="#10b981" height={40} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between font-semibold text-slate-700 mb-1">
+                  <span className="flex items-center gap-1.5"><HardDrive className="h-3.5 w-3.5 text-slate-400" /> Memory (RAM)</span>
+                  <span className="text-pink-600 font-bold">{stats.system.memory.percent}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200 mt-2 mb-1.5">
+                  <div
+                    className="bg-gradient-to-r from-pink-500 to-rose-500 h-1.5 rounded-full transition-all"
+                    style={{ width: \\%\ }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-[9px] text-slate-400 font-mono mb-2">
+                  <span>{formatBytes(stats.system.memory.used)} Used</span>
+                  <span>{formatBytes(stats.system.memory.total)} Total</span>
+                </div>
+                <div className="mt-1 h-8 bg-slate-50 rounded-lg p-1 border border-slate-100">
+                  <SparklineChart data={metricsHistory.map(m => m.memoryTotalBytes ? (m.memoryUsedBytes / m.memoryTotalBytes * 100) : 0)} color="#ec4899" height={24} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between font-semibold text-slate-700 mb-1">
+                  <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5 text-slate-400" /> Network I/O</span>
+                  <span className="text-blue-600 font-bold">Active</span>
+                </div>
+                <div className="flex justify-between text-[9px] text-slate-400 font-mono mb-2 mt-2">
+                  <span className="text-blue-500">RX (Download)</span>
+                  <span className="text-indigo-400">TX (Upload)</span>
+                </div>
+                <div className="mt-1 h-12 bg-slate-50 rounded-lg p-1 border border-slate-100 relative">
+                  <div className="absolute inset-0 p-1 opacity-50">
+                     <SparklineChart data={metricsHistory.map(m => m.networkTxBytes || 0)} color="#818cf8" height={40} />
+                  </div>
+                  <div className="absolute inset-0 p-1">
+                     <SparklineChart data={metricsHistory.map(m => m.networkRxBytes || 0)} color="#3b82f6" height={40} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between font-semibold text-slate-700 mb-2">
+                    <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> System Status</span>
+                  </div>
+                  <div className="space-y-2.5 mt-3">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">Traefik Routing</span>
+                      <Badge variant={stats.traefikRunning ? "success" : "secondary"} className="text-[9px] px-1.5 py-0">
+                        {stats.traefikRunning ? "Healthy" : "Offline"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">Docker Engine</span>
+                      <Badge variant="success" className="text-[9px] px-1.5 py-0 bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200">
+                        v{stats.version || "Active"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">Running Apps</span>
+                      <span className="font-bold font-mono text-slate-700">{stats.runningContainers} / {stats.containers}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
