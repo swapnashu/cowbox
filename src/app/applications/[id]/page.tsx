@@ -32,6 +32,7 @@ import {
   Sparkles,
   Download,
   Upload,
+  Cpu,
   HardDrive,
   Activity,
   Zap,
