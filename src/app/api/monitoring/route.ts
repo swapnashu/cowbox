@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { metrics } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 
 export async function GET(req: Request) {
   try {
@@ -22,9 +22,11 @@ export async function GET(req: Request) {
       .select()
       .from(metrics)
       .where(condition)
-      .orderBy(metrics.timestamp);
+      .orderBy(desc(metrics.timestamp))
+      .limit(60);
 
-    return NextResponse.json(data);
+    return NextResponse.json(data.reverse());
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

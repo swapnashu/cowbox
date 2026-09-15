@@ -107,3 +107,25 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const { oldPath, newPath } = await req.json();
+    if (!oldPath || !newPath) {
+      return NextResponse.json({ error: "oldPath and newPath are required" }, { status: 400 });
+    }
+
+    const fullOldPath = resolveSafePath(oldPath);
+    const fullNewPath = resolveSafePath(newPath);
+
+    if (!fs.existsSync(fullOldPath)) {
+      return NextResponse.json({ error: "Source file does not exist" }, { status: 404 });
+    }
+
+    fs.renameSync(fullOldPath, fullNewPath);
+
+    return NextResponse.json({ success: true, message: \Renamed to \\ });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

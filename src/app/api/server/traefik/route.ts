@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      await docker.pull("traefik:v3.1");
+      await docker.pull("traefik:v3.7");
     } catch (e) {}
 
     const traefikArgs = [
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     const container = await docker.createContainer({
-      Image: "traefik:v3.1",
+      Image: "traefik:v3.7",
       name: "cowbox-traefik",
       Cmd: traefikArgs,
       HostConfig: {

@@ -25,32 +25,34 @@ export async function POST(
 
     const { filename, rawSql } = await req.json();
 
-    let sqlContent = "";
+    let backupFilePath = "";
     if (filename) {
-      const backupPath = path.join(backupsDir, path.basename(filename));
-      if (!fs.existsSync(backupPath)) {
+      backupFilePath = path.join(backupsDir, path.basename(filename));
+      if (!fs.existsSync(backupFilePath)) {
         return NextResponse.json({ error: "Backup file not found" }, { status: 404 });
       }
-      sqlContent = fs.readFileSync(backupPath, "utf-8");
-    } else if (rawSql) {
-      sqlContent = rawSql;
-    } else {
+    } else if (!rawSql) {
       return NextResponse.json({ error: "Please provide a backup filename or raw SQL script" }, { status: 400 });
     }
 
     const container = docker.getContainer(database.containerId);
-
+    const pass = database.databasePassword || database.rootPassword;
+    const envList: string[] = [];
     let restoreCmd: string[] = [];
+
     if (database.type === "postgres") {
+      if (pass) envList.push(`PGPASSWORD=${pass}`);
       restoreCmd = ["psql", "-U", database.databaseUser || "postgres", "-d", database.databaseName];
     } else if (database.type === "mysql" || database.type === "mariadb") {
-      restoreCmd = ["mysql", "-u", database.databaseUser || "root", `-p${database.rootPassword}`, database.databaseName];
+      if (pass) envList.push(`MYSQL_PWD=${pass}`);
+      restoreCmd = ["mysql", "-u", database.databaseUser || "root", database.databaseName];
     } else {
       return NextResponse.json({ error: `Restore not supported for ${database.type} via SQL` }, { status: 400 });
     }
 
     const exec = await container.exec({
       Cmd: restoreCmd,
+      Env: envList.length > 0 ? envList : undefined,
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
@@ -66,12 +68,17 @@ export async function POST(
       stream.on("end", () => resolve());
       stream.on("error", (err: any) => reject(err));
 
-      // Stream the SQL content into the container process's stdin
-      try {
-        stream.write(sqlContent);
-        stream.end();
-      } catch (err) {
-        reject(err);
+      if (backupFilePath) {
+        const fileStream = fs.createReadStream(backupFilePath);
+        fileStream.on("error", (err) => reject(err));
+        fileStream.pipe(stream);
+      } else {
+        try {
+          stream.write(rawSql);
+          stream.end();
+        } catch (err) {
+          reject(err);
+        }
       }
     });
 

@@ -68,44 +68,64 @@ export async function POST(
     if (database.containerId) {
       try {
         const container = docker.getContainer(database.containerId);
-        let cmd = ["pg_dump", "-U", database.databaseUser || "postgres", database.databaseName];
-        if (database.type === "mysql" || database.type === "mariadb") {
-          cmd = ["mysqldump", "-u", database.databaseUser || "root", `-p${database.rootPassword}`, database.databaseName];
+        const pass = database.databasePassword || database.rootPassword;
+        const envList: string[] = [];
+        let cmd: string[] = [];
+
+        if (database.type === "postgres") {
+          if (pass) envList.push(`PGPASSWORD=${pass}`);
+          cmd = ["pg_dump", "-U", database.databaseUser || "postgres", database.databaseName];
+        } else if (database.type === "mysql" || database.type === "mariadb") {
+          if (pass) envList.push(`MYSQL_PWD=${pass}`);
+          cmd = ["mysqldump", "-u", database.databaseUser || "root", database.databaseName];
         } else if (database.type === "redis") {
-          cmd = ["sh", "-c", database.rootPassword ? `redis-cli -a "${database.rootPassword}" bgsave` : "redis-cli bgsave"];
+          if (pass) envList.push(`REDISCLI_AUTH=${pass}`);
+          cmd = ["sh", "-c", "redis-cli --rdb -"];
         } else if (database.type === "mongodb") {
-          cmd = ["mongodump", "--archive"];
+          const user = database.databaseUser || "root";
+          if (pass) {
+            cmd = ["mongodump", "-u", user, "-p", pass, "--authenticationDatabase", "admin", "--archive"];
+          } else {
+            cmd = ["mongodump", "--archive"];
+          }
         } else if (database.type === "clickhouse") {
           cmd = ["clickhouse-client", "-q", `BACKUP DATABASE ${database.databaseName} TO Disk('backups', '${fileName}')`];
+        } else {
+          throw new Error(`Unsupported database type: ${database.type}`);
         }
 
         const exec = await container.exec({
           Cmd: cmd,
+          Env: envList.length > 0 ? envList : undefined,
           AttachStdout: true,
           AttachStderr: true,
         });
 
         const stream = await exec.start({ hijack: true });
         const outputStream = fs.createWriteStream(filePath);
+        let errorOutput = "";
         const errStream = new (require("stream").PassThrough)();
-        
+        errStream.on("data", (chunk: Buffer) => {
+          errorOutput += chunk.toString("utf-8");
+        });
+
         await new Promise((resolve, reject) => {
           docker.modem.demuxStream(stream, outputStream, errStream);
           stream.on("end", resolve);
           stream.on("error", reject);
         });
-      } catch (dumpErr) {
-        // Fallback: write metadata backup snapshot
-        fs.writeFileSync(
-          filePath,
-          `-- Backup Snapshot for ${database.name} (${database.type})\n-- Date: ${new Date().toISOString()}\n-- Database: ${database.databaseName}\n-- User: ${database.databaseUser}\n`
-        );
+
+        const inspectData = await exec.inspect();
+        if (inspectData.ExitCode !== 0 && inspectData.ExitCode !== null) {
+          try { fs.unlinkSync(filePath); } catch (_) {}
+          throw new Error(`Dump process exited with code ${inspectData.ExitCode}: ${errorOutput.trim() || "Unknown error"}`);
+        }
+      } catch (dumpErr: any) {
+        try { fs.unlinkSync(filePath); } catch (_) {}
+        return NextResponse.json({ error: `Database backup failed: ${dumpErr.message}` }, { status: 500 });
       }
     } else {
-      fs.writeFileSync(
-        filePath,
-        `-- Snapshot for ${database.name} (${database.type})\n-- Date: ${new Date().toISOString()}\n`
-      );
+      return NextResponse.json({ error: "Database container is not running" }, { status: 400 });
     }
 
     const stats = fs.statSync(filePath);

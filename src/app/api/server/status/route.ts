@@ -5,6 +5,8 @@ import { COWBOX_VERSION } from "@/lib/version";
 import os from "os";
 import * as fs from "fs";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     await initializeDatabase();

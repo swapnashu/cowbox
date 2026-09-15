@@ -34,13 +34,13 @@ export async function GET() {
       },
       {
         name: "Zombie / Stopped Containers",
-        status: stoppedContainers.length > 5 ? "warn" : "pass",
+        status: stoppedContainers.length > 50 ? "warn" : "pass",
         message: `${stoppedContainers.length} stopped container(s) detected`,
         count: stoppedContainers.length,
       },
       {
         name: "Dangling Unused Images",
-        status: danglingImages.length > 0 ? "warn" : "pass",
+        status: danglingImages.length > 20 ? "warn" : "pass",
         message: `${danglingImages.length} dangling image layer(s) ready for cleanup`,
         count: danglingImages.length,
       },

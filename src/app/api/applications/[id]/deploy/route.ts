@@ -184,6 +184,22 @@ export async function POST(
       }
     }
 
+    // If a static Host Port is mapped, we CANNOT do zero-downtime deployments because the new container will fail to bind the same host port.
+    let oldContainerStoppedEarly = false;
+    if (app.exposedPort && app.containerId) {
+      addLog(`Static Host Port ${app.exposedPort} is mapped. Zero-downtime deployment disabled to avoid port conflicts.`);
+      addLog(`Stopping previous container ${app.containerId.substring(0, 12)}...`);
+      try {
+        const oldContainer = docker.getContainer(app.containerId);
+        await oldContainer.stop({ t: 10 }).catch(() => {});
+        await oldContainer.remove({ force: true }).catch(() => {});
+        oldContainerStoppedEarly = true;
+        addLog(`Previous container stopped successfully.`);
+      } catch (err: any) {
+        addLog(`Note during old container stop: ${err.message}`);
+      }
+    }
+
     // Deploy new container
     addLog(`Creating and launching container...`);
     const container = await deployAppContainer({
@@ -204,7 +220,7 @@ export async function POST(
 
     // Zero-Downtime Health Check Probing
     let isHealthy = false;
-    const maxAttempts = 10;
+    const maxAttempts = 5;
     const probePath = app.healthCheckPath || "/";
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -219,7 +235,7 @@ export async function POST(
 
         if (containerIp) {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          const timeoutId = setTimeout(() => controller.abort(), 1500);
 
           try {
             const probeRes = await fetch(`http://${containerIp}:${app.containerPort}${probePath}`, {
@@ -240,7 +256,9 @@ export async function POST(
         if (attempt === maxAttempts) throw inspectErr;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
 
     if (!isHealthy) {
@@ -248,7 +266,7 @@ export async function POST(
     }
 
     // Stop and clean up old container now that new container is confirmed serving traffic
-    if (app.containerId && app.containerId !== container.id) {
+    if (!oldContainerStoppedEarly && app.containerId && app.containerId !== container.id) {
       addLog(`Gracefully draining and shutting down previous container ${app.containerId.substring(0, 12)}...`);
       try {
         const oldContainer = docker.getContainer(app.containerId);

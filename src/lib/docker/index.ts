@@ -121,7 +121,7 @@ export async function ensureTraefikRunning(letsEncryptEmail = ""): Promise<strin
   }
 
   try {
-    await pullDockerImage("traefik:v3.1");
+    await pullDockerImage("traefik:v3.7");
   } catch (e) {}
 
   const traefikArgs = [
@@ -143,7 +143,7 @@ export async function ensureTraefikRunning(letsEncryptEmail = ""): Promise<strin
   }
 
   const container = await docker.createContainer({
-    Image: "traefik:v3.1",
+    Image: "traefik:v3.7",
     name: "cowbox-traefik",
     Cmd: traefikArgs,
     HostConfig: {

@@ -25,6 +25,7 @@ import {
   Upload,
   Layers,
   FileText,
+  Edit2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -336,6 +337,32 @@ export default function FileManagerPage() {
     }
   };
 
+  const handleRename = async (filePath: string, oldName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newName = prompt(`Rename ${oldName} to:`, oldName);
+    if (!newName || newName === oldName) return;
+
+    // if in root, there's no slash.
+    const lastSlash = filePath.lastIndexOf('/');
+    const newPath = lastSlash >= 0 ? filePath.substring(0, lastSlash + 1) + newName : newName;
+    
+    try {
+      const res = await fetch("/api/files", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPath: filePath, newPath }),
+      });
+      if (res.ok) {
+        fetchFiles(currentDir);
+        if (activeFile === filePath) {
+          setActiveFile(newPath);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleRunFile = async () => {
     if (!activeFile) return;
     await handleSaveFile();
@@ -428,7 +455,7 @@ export default function FileManagerPage() {
               File Manager & Code Runner
             </h1>
             <Badge variant="pink" className="text-[11px] font-mono">
-              data/workspace
+              Project Root
             </Badge>
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -489,11 +516,35 @@ export default function FileManagerPage() {
         {/* Left Explorer (4 cols) */}
         <Card className="lg:col-span-4 h-[750px] flex flex-col justify-between shadow-sm">
           <div className="p-3 border-b border-slate-100 flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <Folder className="h-4 w-4 text-pink-500" />
-                Workspace Files
-              </span>
+            <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Folder className="h-4 w-4 text-pink-500" />
+                  Workspace Files
+                </span>
+                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono flex-wrap">
+                  <span 
+                    onClick={() => { setCurrentDir(""); fetchFiles(""); }} 
+                    className="cursor-pointer hover:text-pink-600 hover:underline"
+                  >
+                    root
+                  </span>
+                  {currentDir.split('/').filter(Boolean).map((part, index, arr) => {
+                    const pathUpToHere = arr.slice(0, index + 1).join('/');
+                    return (
+                      <span key={pathUpToHere} className="flex items-center gap-1">
+                        <ChevronRight className="h-3 w-3" />
+                        <span 
+                          onClick={() => { setCurrentDir(pathUpToHere); fetchFiles(pathUpToHere); }}
+                          className="cursor-pointer hover:text-pink-600 hover:underline"
+                        >
+                          {part}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex items-center gap-1">
                 <label className="p-1.5 rounded-lg hover:bg-pink-50 text-slate-500 hover:text-pink-600 cursor-pointer transition-colors" title="Upload File">
                   <input type="file" onChange={handleUploadFile} className="hidden" />
@@ -571,6 +622,13 @@ export default function FileManagerPage() {
                           {formatBytes(file.sizeBytes, 0)}
                         </span>
                       )}
+                      <button
+                        onClick={(e) => handleRename(file.path, file.name, e)}
+                        className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Rename"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         onClick={(e) => handleDeleteFile(file.path, e)}
                         className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"

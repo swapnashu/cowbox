@@ -280,7 +280,7 @@ export default function DashboardPage() {
               </div>
               <p className="text-[11px] text-slate-500 truncate">{stats.system.cpuModel}</p>
               <div className="mt-2 h-10">
-                <SparklineChart data={metricsHistory.map(m => m.cpuPercent || 0)} color="#10b981" height={40} />
+                <SparklineChart data={metricsHistory.map(m => parseFloat(m.cpuPercent) || 0)} color="#10b981" height={40} />
               </div>
             </div>
 
@@ -300,7 +300,7 @@ export default function DashboardPage() {
                 <span>Total: {formatBytes(stats.system.memory.total)}</span>
               </div>
               <div className="mt-2 h-10">
-                <SparklineChart data={metricsHistory.map(m => m.memoryPercent || 0)} color="#ec4899" height={40} />
+                <SparklineChart data={metricsHistory.map(m => m.memoryTotalBytes ? (m.memoryUsedBytes / m.memoryTotalBytes * 100) : 0)} color="#ec4899" height={40} />
               </div>
             </div>
 
