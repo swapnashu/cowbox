@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: \File \ saved successfully\,
+      message: `File ${path.basename(fullPath)} saved successfully`,
       path: path.relative(WORKSPACE_ROOT, fullPath).replace(/\\/g, "/"),
       sizeBytes: stats.size,
     });
@@ -101,7 +101,7 @@ export async function DELETE(req: Request) {
       fs.unlinkSync(fullPath);
     }
 
-    return NextResponse.json({ success: true, message: \Deleted \\ });
+    return NextResponse.json({ success: true, message: `Deleted ${path.basename(fullPath)}` });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -122,7 +122,7 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: "Source file does not exist" }, { status: 404 });
       }
       fs.copyFileSync(fullSource, fullDest);
-      return NextResponse.json({ success: true, message: \Copied to \\ });
+      return NextResponse.json({ success: true, message: `Copied to ${path.basename(fullDest)}` });
     }
 
     if (!oldPath || !newPath) {
@@ -138,7 +138,7 @@ export async function PUT(req: Request) {
 
     fs.renameSync(fullOldPath, fullNewPath);
 
-    return NextResponse.json({ success: true, message: \Renamed to \\ });
+    return NextResponse.json({ success: true, message: `Renamed to ${path.basename(fullNewPath)}` });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -327,15 +327,26 @@ export default function ServerSettingsPage() {
 
       {/* Docker Storage & Volumes Inspector */}
       {storageData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Volumes Card */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Database className="h-5 w-5 text-amber-500" />
-                Docker Persistent Storage Volumes ({storageData.volumes?.length || 0})
-              </CardTitle>
-            </CardHeader>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Garbage Collection</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Free up disk space by clearing stopped containers, dangling images, and unused volumes.</p>
+            </div>
+            <Button onClick={handleRunDoctorHealing} isLoading={isHealing} size="sm" variant="outline" className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200 font-bold gap-1.5">
+              <Trash2 className="h-4 w-4" />
+              Clear Leftovers & Stopped Containers
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Volumes Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Database className="h-5 w-5 text-amber-500" />
+                  Docker Persistent Storage Volumes ({storageData.volumes?.length || 0})
+                </CardTitle>
+              </CardHeader>
             <CardContent>
               {storageData.volumes?.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">No volumes found</div>
@@ -375,6 +386,7 @@ export default function ServerSettingsPage() {
               )}
             </CardContent>
           </Card>
+        </div>
         </div>
       )}
     </div>
