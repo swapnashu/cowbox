@@ -363,6 +363,30 @@ export default function FileManagerPage() {
     }
   };
 
+  const handleCopy = async (filePath: string, oldName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newName = prompt(`Duplicate ${oldName} as:`, `copy_${oldName}`);
+    if (!newName || newName === oldName) return;
+
+    const lastSlash = filePath.lastIndexOf('/');
+    const newPath = lastSlash >= 0 ? filePath.substring(0, lastSlash + 1) + newName : newName;
+    
+    try {
+      const res = await fetch("/api/files", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "copy", sourcePath: filePath, destPath: newPath }),
+      });
+      if (res.ok) {
+        fetchFiles(currentDir);
+      } else {
+        alert("Failed to duplicate file");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleRunFile = async () => {
     if (!activeFile) return;
     await handleSaveFile();
@@ -435,6 +459,13 @@ export default function FileManagerPage() {
       case "yaml":
       case "yml":
         return <FileCode className="h-4 w-4 text-rose-500" />;
+      case "png":
+      case "jpg":
+      case "jpeg":
+      case "gif":
+      case "svg":
+      case "webp":
+        return <Sparkles className="h-4 w-4 text-purple-500" />;
       default:
         return <FileCode className="h-4 w-4 text-slate-400" />;
     }
@@ -616,12 +647,25 @@ export default function FileManagerPage() {
                       <span className="truncate">{file.name}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-3">
                       {!file.isDirectory && (
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {formatBytes(file.sizeBytes, 0)}
-                        </span>
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {formatBytes(file.sizeBytes, 0)}
+                          </span>
+                          <span className="text-[9px] text-slate-400">
+                            {new Date(file.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
                       )}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => handleCopy(file.path, file.name, e)}
+                        className="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Duplicate"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         onClick={(e) => handleRename(file.path, file.name, e)}
                         className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -629,13 +673,14 @@ export default function FileManagerPage() {
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        onClick={(e) => handleDeleteFile(file.path, e)}
-                        className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                        <button
+                          onClick={(e) => handleDeleteFile(file.path, e)}
+                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -690,19 +735,25 @@ export default function FileManagerPage() {
               </div>
             </div>
 
-            <div className="flex-1 relative bg-white">
-              <textarea
-                ref={textareaRef}
-                value={fileContent}
-                onChange={(e) => {
-                  setFileContent(e.target.value);
-                  setIsSaved(false);
-                }}
-                onKeyDown={handleKeyDownEditor}
-                className="w-full h-full p-4 font-mono text-xs text-slate-900 bg-white resize-none focus:outline-none leading-relaxed terminal-scroll selection:bg-pink-100"
-                placeholder="Write or edit code here..."
-                spellCheck={false}
-              />
+            <div className="flex-1 relative bg-white overflow-hidden">
+              {activeFile && /\.(png|jpe?g|gif|svg|webp)$/i.test(activeFile) ? (
+                <div className="flex items-center justify-center h-full w-full bg-slate-100 p-4">
+                  <img src={`/api/files/raw?path=${encodeURIComponent(activeFile)}`} alt={activeFile} className="max-w-full max-h-full object-contain shadow-sm border border-slate-200 rounded-md" />
+                </div>
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  value={fileContent}
+                  onChange={(e) => {
+                    setFileContent(e.target.value);
+                    setIsSaved(false);
+                  }}
+                  onKeyDown={handleKeyDownEditor}
+                  className="w-full h-full p-4 font-mono text-xs text-slate-900 bg-white resize-none focus:outline-none leading-relaxed terminal-scroll selection:bg-pink-100"
+                  placeholder="Write or edit code here..."
+                  spellCheck={false}
+                />
+              )}
             </div>
           </Card>
 

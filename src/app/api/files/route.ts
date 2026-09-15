@@ -35,7 +35,6 @@ export async function GET(req: Request) {
       };
     });
 
-    // Sort: directories first, then alphabetically
     items.sort((a, b) => {
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;
@@ -71,7 +70,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `File ${path.basename(fullPath)} saved successfully`,
+      message: \File \ saved successfully\,
       path: path.relative(WORKSPACE_ROOT, fullPath).replace(/\\/g, "/"),
       sizeBytes: stats.size,
     });
@@ -102,7 +101,7 @@ export async function DELETE(req: Request) {
       fs.unlinkSync(fullPath);
     }
 
-    return NextResponse.json({ success: true, message: `Deleted ${path.basename(fullPath)}` });
+    return NextResponse.json({ success: true, message: \Deleted \\ });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -110,9 +109,24 @@ export async function DELETE(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const { oldPath, newPath } = await req.json();
+    const body = await req.json();
+    const { action, oldPath, newPath, sourcePath, destPath } = body;
+
+    if (action === "copy") {
+      if (!sourcePath || !destPath) {
+        return NextResponse.json({ error: "sourcePath and destPath are required for copy" }, { status: 400 });
+      }
+      const fullSource = resolveSafePath(sourcePath);
+      const fullDest = resolveSafePath(destPath);
+      if (!fs.existsSync(fullSource)) {
+        return NextResponse.json({ error: "Source file does not exist" }, { status: 404 });
+      }
+      fs.copyFileSync(fullSource, fullDest);
+      return NextResponse.json({ success: true, message: \Copied to \\ });
+    }
+
     if (!oldPath || !newPath) {
-      return NextResponse.json({ error: "oldPath and newPath are required" }, { status: 400 });
+      return NextResponse.json({ error: "oldPath and newPath are required for rename" }, { status: 400 });
     }
 
     const fullOldPath = resolveSafePath(oldPath);
