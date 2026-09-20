@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { docker, checkDockerConnection } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const status = await checkDockerConnection();
     if (!status.connected) {
       return NextResponse.json({ error: "Docker daemon not connected" }, { status: 500 });

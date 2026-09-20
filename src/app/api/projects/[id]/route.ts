@@ -3,12 +3,15 @@ import { db, initializeDatabase } from "@/lib/db";
 import { projects, applications, databases, composeStacks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [project] = await db
       .select()
@@ -50,6 +53,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
 
     // Find and cleanup any running containers associated with this project

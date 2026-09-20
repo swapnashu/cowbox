@@ -3,12 +3,15 @@ import { db, initializeDatabase } from "@/lib/db";
 import { databases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [database] = await db
       .select()
@@ -45,7 +48,20 @@ export async function GET(
     }
 
     return NextResponse.json({
-      ...database,
+      id: database.id,
+      projectId: database.projectId,
+      name: database.name,
+      type: database.type,
+      version: database.version,
+      databaseName: database.databaseName,
+      databaseUser: database.databaseUser,
+      exposedPort: database.exposedPort,
+      internalPort: database.internalPort,
+      containerId: database.containerId,
+      status: database.status,
+      volumeName: database.volumeName,
+      createdAt: database.createdAt,
+      updatedAt: database.updatedAt,
       internalConnectionUrl: connectionUrl,
     });
   } catch (error: any) {
@@ -58,6 +74,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [database] = await db
       .select()

@@ -4,12 +4,15 @@ import { applications, domains, auditLogs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateSslipDomain } from "@/lib/domain";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [sourceApp] = await db
       .select()

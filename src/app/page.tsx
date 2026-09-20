@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   FolderKanban,
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const [isRestartingAll, setIsRestartingAll] = useState(false);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [serverRes, projectsRes, metricsRes] = await Promise.all([
         fetch("/api/server/status"),
@@ -51,20 +51,17 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-    const intervalId = setInterval(async () => {
-      try {
-        await fetch("/api/monitoring/collect", { method: "POST" });
-        loadData();
-      } catch (e) {}
+    const intervalId = setInterval(() => {
+      loadData();
     }, 60000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [loadData]);
 
-  const handleRestartAll = async () => {
+  const handleRestartAll = useCallback(async () => {
     if (!confirm("Restart all running containers on this server?")) return;
     setIsRestartingAll(true);
     try {
@@ -80,11 +77,11 @@ export default function DashboardPage() {
     } finally {
       setIsRestartingAll(false);
     }
-  };
+  }, [loadData]);
 
-  const totalApps = projects.reduce((acc, p) => acc + (p.applicationsCount || 0), 0);
-  const totalDbs = projects.reduce((acc, p) => acc + (p.databasesCount || 0), 0);
-  const runningApps = projects.reduce((acc, p) => acc + (p.runningAppsCount || 0), 0);
+  const totalApps = useMemo(() => projects.reduce((acc, p) => acc + (p.applicationsCount || 0), 0), [projects]);
+  const totalDbs = useMemo(() => projects.reduce((acc, p) => acc + (p.databasesCount || 0), 0), [projects]);
+  const runningApps = useMemo(() => projects.reduce((acc, p) => acc + (p.runningAppsCount || 0), 0), [projects]);
   const serverIp = stats?.serverIp || "127.0.0.1";
 
   return (
@@ -448,7 +445,9 @@ export default function DashboardPage() {
   );
 }
 
-function ActivityFeed() {
+import React from "react";
+
+const ActivityFeed = React.memo(function ActivityFeed() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -471,9 +470,11 @@ function ActivityFeed() {
     </div>
   );
 
+  const sliced = activities.slice(0, 15);
+
   return (
     <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
-      {activities.slice(0, 15).map((activity, i) => (
+      {sliced.map((activity, i) => (
         <div key={i} className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50 transition-colors">
           <div className="flex items-center gap-3">
             <span className={`h-2.5 w-2.5 rounded-full ${
@@ -505,4 +506,4 @@ function ActivityFeed() {
       ))}
     </div>
   );
-}
+});

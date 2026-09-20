@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auditLogs, deployments } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const recentAuditLogs = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(30);
     const recentDeployments = await db.select().from(deployments).orderBy(desc(deployments.createdAt)).limit(30);
 

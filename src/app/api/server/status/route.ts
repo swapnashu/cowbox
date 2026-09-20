@@ -4,11 +4,14 @@ import { initializeDatabase } from "@/lib/db";
 import { COWBOX_VERSION } from "@/lib/version";
 import os from "os";
 import * as fs from "fs";
+import { requireAuth } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const dockerStatus = await checkDockerConnection();
 

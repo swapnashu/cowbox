@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { statusMonitors } from "@/lib/db/schema";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const monitors = await db.select().from(statusMonitors);
     return NextResponse.json(monitors);
@@ -15,6 +18,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const body = await req.json();
     

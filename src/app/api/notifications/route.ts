@@ -3,9 +3,12 @@ import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const channels = await db.select().from(notifications).orderBy(desc(notifications.createdAt));
     return NextResponse.json(channels);
   } catch (error) {
@@ -15,6 +18,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { channel, name, webhookUrl, events } = await req.json();
     if (!channel || !name || !webhookUrl) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });

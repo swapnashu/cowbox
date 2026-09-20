@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { framework = "node", port = 80, nodeVersion = "20", pythonVersion = "3.11" } = await req.json();
 
     let generatedDockerfile = "";

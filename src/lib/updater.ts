@@ -1,4 +1,6 @@
 import { COWBOX_VERSION } from "@/lib/version";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface UpdateInfo {
   hasUpdate: boolean;
@@ -15,6 +17,7 @@ export interface UpdateInfo {
     notes?: string;
     publishedAt?: string;
   };
+  activeMethod: "pip" | "docker" | "git";
   instructions: {
     pip: string;
     docker: string;
@@ -60,7 +63,6 @@ export async function checkForUpdates(force = false): Promise<UpdateInfo> {
   let githubNotes = "";
   let githubPublishedAt = "";
 
-  // 1. Fetch PyPI Info
   try {
     const pypiRes = await fetch("https://pypi.org/pypi/cowbox/json", {
       headers: { "User-Agent": "Cowbox-Update-Checker/1.0" },
@@ -76,11 +78,8 @@ export async function checkForUpdates(force = false): Promise<UpdateInfo> {
         pypiPublishedAt = data.urls[0].upload_time_iso_8601;
       }
     }
-  } catch (err) {
-    console.error("Failed to check PyPI for updates:", err);
-  }
+  } catch (err) {}
 
-  // 2. Fetch GitHub Releases / Tags
   try {
     const ghRes = await fetch("https://api.github.com/repos/swapnashu/cowbox/releases/latest", {
       headers: { "User-Agent": "Cowbox-Update-Checker/1.0" },
@@ -95,7 +94,6 @@ export async function checkForUpdates(force = false): Promise<UpdateInfo> {
         githubPublishedAt = ghData.published_at || "";
       }
     } else {
-      // Fallback to tags if no formal release
       const tagsRes = await fetch("https://api.github.com/repos/swapnashu/cowbox/tags", {
         headers: { "User-Agent": "Cowbox-Update-Checker/1.0" },
         next: { revalidate: 300 },
@@ -108,11 +106,8 @@ export async function checkForUpdates(force = false): Promise<UpdateInfo> {
         }
       }
     }
-  } catch (err) {
-    console.error("Failed to check GitHub for updates:", err);
-  }
+  } catch (err) {}
 
-  // Determine highest latest version between PyPI and GitHub
   let latestVersion = currentVersion;
   if (compareSemver(pypiVersion, latestVersion) > 0) {
     latestVersion = pypiVersion;
@@ -123,10 +118,18 @@ export async function checkForUpdates(force = false): Promise<UpdateInfo> {
 
   const hasUpdate = compareSemver(currentVersion, latestVersion) < 0;
 
+  let activeMethod: "pip" | "docker" | "git" = "pip";
+  if (process.env.DOCKER_CONTAINER || fs.existsSync("/.dockerenv")) {
+    activeMethod = "docker";
+  } else if (fs.existsSync(path.join(process.cwd(), ".git"))) {
+    activeMethod = "git";
+  }
+
   cachedUpdateInfo = {
     hasUpdate,
     currentVersion,
     latestVersion,
+    activeMethod,
     pypi: {
       version: pypiVersion,
       url: pypiUrl,

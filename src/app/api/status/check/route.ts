@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { docker } from "@/lib/docker";
 import crypto from "crypto";
 import net from "net";
+import { requireAuth } from "@/lib/auth/guard";
 
 async function checkHttp(url: string, expectedStatus: number): Promise<{ isUp: boolean, time: number }> {
   const start = Date.now();
@@ -49,6 +50,8 @@ async function checkTcp(url: string): Promise<{ isUp: boolean, time: number }> {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const monitors = await db.select().from(statusMonitors).where(eq(statusMonitors.enabled, true));
     

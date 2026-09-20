@@ -4,9 +4,12 @@ import { metrics } from "@/lib/db/schema";
 import { docker } from "@/lib/docker";
 import crypto from "crypto";
 import { sql } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     
     // Fetch all running containers

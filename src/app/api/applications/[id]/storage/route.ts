@@ -3,12 +3,15 @@ import { db, initializeDatabase } from "@/lib/db";
 import { applications, appVolumes, volumes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [app] = await db
       .select()
@@ -35,6 +38,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [app] = await db
       .select()
@@ -123,6 +128,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { searchParams } = new URL(req.url);
     const volumeId = searchParams.get("volumeId");

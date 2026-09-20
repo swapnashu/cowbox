@@ -1,45 +1,53 @@
 import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { applications, domains, projects } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
 
-    let query = db.select().from(applications).orderBy(desc(applications.createdAt));
+    let allApps;
     if (projectId) {
-      // @ts-ignore
-      query = db.select().from(applications).where(eq(applications.projectId, projectId)).orderBy(desc(applications.createdAt));
+      allApps = await db.select().from(applications).where(eq(applications.projectId, projectId)).orderBy(desc(applications.createdAt));
+    } else {
+      allApps = await db.select().from(applications).orderBy(desc(applications.createdAt));
     }
 
-    const allApps = await query;
+    const appIds = allApps.map(a => a.id);
+    const allDomains = appIds.length > 0
+      ? await db.select().from(domains).where(inArray(domains.applicationId, appIds))
+      : [];
 
-    // Attach domains for each app
-    const results = await Promise.all(
-      allApps.map(async (app) => {
-        const appDomains = await db
-          .select()
-          .from(domains)
-          .where(eq(domains.applicationId, app.id));
-        return {
-          ...app,
-          domains: appDomains,
-        };
-      })
-    );
+    const domainsByApp = new Map<string, typeof allDomains>();
+    for (const d of allDomains) {
+      const list = domainsByApp.get(d.applicationId) || [];
+      list.push(d);
+      domainsByApp.set(d.applicationId, list);
+    }
+
+    const results = allApps.map((app) => ({
+      ...app,
+      domains: domainsByApp.get(app.id) || [],
+    }));
 
     return NextResponse.json(results);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[Applications] GET error:", error.message);
+    return NextResponse.json({ error: "Failed to fetch applications" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const body = await req.json();
     const {
@@ -106,6 +114,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(createdApp, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[Applications] POST error:", error.message);
+    return NextResponse.json({ error: "Failed to create application" }, { status: 500 });
   }
 }

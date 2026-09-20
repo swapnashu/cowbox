@@ -4,9 +4,12 @@ import { dispatchEvent } from "@/lib/notifications/dispatcher";
 import { db, initializeDatabase } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { searchParams } = new URL(req.url);
     const force = searchParams.get("force") === "true";
 
@@ -22,13 +25,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const updateInfo = await checkForUpdates(true);
 
     if (updateInfo.hasUpdate) {
       await dispatchEvent("system:update_available", {
-        title: `🚀 Cowbox Update Available (${updateInfo.latestVersion})`,
-        message: `A new version of Cowbox is available (Current: v${updateInfo.currentVersion} -> Latest: v${updateInfo.latestVersion}). Run: ${updateInfo.instructions.pip}`,
+        title: `📢 Cowbox Update Available (${updateInfo.latestVersion})`,
+        message: `A new version of Cowbox is available (Current: v${updateInfo.currentVersion} -> Latest: v${updateInfo.latestVersion}). Run: ${updateInfo.instructions[updateInfo.activeMethod]}`,
         status: "warning",
       });
 

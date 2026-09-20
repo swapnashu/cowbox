@@ -13,7 +13,7 @@ interface ModalProps {
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
-export function Modal({
+export const Modal = React.memo(function Modal({
   isOpen,
   onClose,
   title,
@@ -21,17 +21,34 @@ export function Modal({
   children,
   maxWidth = "lg",
 }: ModalProps) {
+  const closeRef = React.useRef<HTMLButtonElement>(null);
+
   React.useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "Tab") {
+        const focusable = document.querySelectorAll('[data-modal-focusable]');
+        const first = focusable[0] as HTMLElement;
+        const last = focusable[focusable.length - 1] as HTMLElement;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
     };
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    }
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    closeRef.current?.focus();
+
     return () => {
       document.body.style.overflow = "unset";
-      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
 
@@ -46,10 +63,17 @@ export function Modal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      aria-describedby={description ? "modal-description" : undefined}
+    >
       <div
         className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
       <div
         className={cn(
@@ -59,14 +83,17 @@ export function Modal({
       >
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+            <h2 id="modal-title" className="text-lg font-bold text-slate-900">{title}</h2>
             {description && (
-              <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+              <p id="modal-description" className="text-xs text-slate-500 mt-0.5">{description}</p>
             )}
           </div>
           <button
+            ref={closeRef}
             onClick={onClose}
+            data-modal-focusable
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            aria-label="Close dialog"
           >
             <X className="h-4 w-4" />
           </button>
@@ -75,4 +102,4 @@ export function Modal({
       </div>
     </div>
   );
-}
+});

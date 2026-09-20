@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { docker, checkDockerConnection } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const status = await checkDockerConnection();
     if (!status.connected) {
       return NextResponse.json({ images: [] });
@@ -37,6 +40,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { image } = await req.json();
 
     if (!image || !image.trim()) {
@@ -70,6 +75,8 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { searchParams } = new URL(req.url);
     const imageId = searchParams.get("id");
     const pruneDangling = searchParams.get("dangling") === "true";

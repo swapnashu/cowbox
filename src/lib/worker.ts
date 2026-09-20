@@ -12,11 +12,17 @@ import { dispatchEvent } from "@/lib/notifications/dispatcher";
 export let workerStarted = false;
 let lastNotifiedUpdateVersion = "";
 const activeScheduledTasks = new Map<string, ScheduledTask>();
+const intervalHandles: NodeJS.Timeout[] = [];
+
+const runningTasks = new Set<string>();
 
 async function checkHttp(url: string, expectedStatus: number): Promise<{ isUp: boolean; time: number }> {
   const start = Date.now();
   try {
-    const res = await fetch(url, { method: "GET", redirect: "follow" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(url, { method: "GET", redirect: "follow", signal: controller.signal });
+    clearTimeout(timeoutId);
     const time = Date.now() - start;
     return { isUp: res.status === expectedStatus, time };
   } catch {
@@ -48,7 +54,13 @@ async function checkTcp(url: string): Promise<{ isUp: boolean; time: number }> {
   });
 }
 
+function isPrivateIP(ip: string): boolean {
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.|169\.254\.|::1|fc|fd)/.test(ip);
+}
+
 export async function runStatusChecks() {
+  if (runningTasks.has("statusChecks")) return;
+  runningTasks.add("statusChecks");
   try {
     const monitors = await db.select().from(statusMonitors).where(eq(statusMonitors.enabled, true));
     for (const monitor of monitors) {
@@ -56,6 +68,8 @@ export async function runStatusChecks() {
       let responseTimeMs = 0;
       try {
         if (monitor.type === "http" && monitor.url) {
+          const urlObj = new URL(monitor.url);
+          if (isPrivateIP(urlObj.hostname)) continue;
           const res = await checkHttp(monitor.url, monitor.expectedStatusCode || 200);
           isUp = res.isUp;
           responseTimeMs = res.time;
@@ -105,16 +119,19 @@ export async function runStatusChecks() {
         .where(eq(statusMonitors.id, monitor.id));
     }
   } catch (err) {
-    // Ignore worker tick error
+    console.error("[Worker] Status check error:", err);
+  } finally {
+    runningTasks.delete("statusChecks");
   }
 }
 
 export async function syncCronJobs() {
+  if (runningTasks.has("cronSync")) return;
+  runningTasks.add("cronSync");
   try {
     const jobs = await db.select().from(cronJobs).where(eq(cronJobs.enabled, true));
     const currentJobIds = new Set(jobs.map((j) => j.id));
 
-    // Stop tasks no longer in DB or disabled
     for (const [jobId, task] of Array.from(activeScheduledTasks.entries())) {
       if (!currentJobIds.has(jobId)) {
         task.stop();
@@ -122,7 +139,6 @@ export async function syncCronJobs() {
       }
     }
 
-    // Schedule newly enabled or updated jobs
     for (const job of jobs) {
       if (activeScheduledTasks.has(job.id)) continue;
       if (!cron.validate(job.schedule)) continue;
@@ -133,16 +149,22 @@ export async function syncCronJobs() {
 
         if (job.targetType === "http") {
           try {
-            const res = await fetch(job.command, { method: "GET" });
-            output = `HTTP ${res.status} ${res.statusText}`;
-            success = res.ok;
+            const urlObj = new URL(job.command);
+            if (isPrivateIP(urlObj.hostname)) {
+              output = "Error: HTTP target resolves to private IP";
+              success = false;
+            } else {
+              const res = await fetch(job.command, { method: "GET" });
+              output = `HTTP ${res.status} ${res.statusText}`;
+              success = res.ok;
+            }
           } catch (err: any) {
             output = `HTTP Error: ${err.message}`;
             success = false;
           }
         } else {
           output = await new Promise<string>((resolve) => {
-            exec(job.command, { timeout: 60000 }, (error, stdout, stderr) => {
+            exec(job.command, { timeout: 60000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
               if (error) {
                 success = false;
                 resolve(`Error (code ${error.code}): ${stderr || error.message}`);
@@ -167,7 +189,9 @@ export async function syncCronJobs() {
       activeScheduledTasks.set(job.id, task);
     }
   } catch (err) {
-    // Ignore sync error
+    console.error("[Worker] Cron sync error:", err);
+  } finally {
+    runningTasks.delete("cronSync");
   }
 }
 
@@ -178,6 +202,8 @@ import { and, isNotNull, desc } from "drizzle-orm";
 const execAsync = util.promisify(exec);
 
 export async function pollGitAutoDeploy() {
+  if (runningTasks.has("gitPoll")) return;
+  runningTasks.add("gitPoll");
   try {
     const autoApps = await db
       .select()
@@ -194,7 +220,6 @@ export async function pollGitAutoDeploy() {
         if (match) {
           const remoteCommit = match[1];
 
-          // Get last deployment commit
           const [latestDeployment] = await db
             .select()
             .from(deployments)
@@ -203,21 +228,28 @@ export async function pollGitAutoDeploy() {
             .limit(1);
 
           if (!latestDeployment || latestDeployment.commitHash !== remoteCommit) {
-            console.log(`🚀 [Auto-Deploy Daemon] Detected new commit ${remoteCommit.substring(0, 7)} on ${app.name} (${branch}). Triggering build...`);
-            fetch(`http://127.0.0.1:9999/api/applications/${app.id}/deploy`, {
+            console.log(`[Auto-Deploy] New commit ${remoteCommit.substring(0, 7)} on ${app.name} (${branch}). Triggering build...`);
+            const port = process.env.PORT || 9999;
+            fetch(`http://127.0.0.1:${port}/api/applications/${app.id}/deploy`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
             }).catch(() => {});
           }
         }
       } catch (gitErr) {
-        // Ignore git network / auth poll errors during interval
+        // Ignore git network errors
       }
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error("[Worker] Git poll error:", err);
+  } finally {
+    runningTasks.delete("gitPoll");
+  }
 }
 
 export async function collectContainerMetrics() {
+  if (runningTasks.has("metrics")) return;
+  runningTasks.add("metrics");
   try {
     const containers = await docker.listContainers({ filters: { status: ["running"] } });
     for (const containerInfo of containers) {
@@ -247,7 +279,7 @@ export async function collectContainerMetrics() {
         let networkRxBytes = 0;
         let networkTxBytes = 0;
         if (stats.networks) {
-          for (const net of Object.values<any>(stats.networks)) {
+          for (const net of Object.values(stats.networks) as any[]) {
             networkRxBytes += net.rx_bytes || 0;
             networkTxBytes += net.tx_bytes || 0;
           }
@@ -262,71 +294,76 @@ export async function collectContainerMetrics() {
           networkRxBytes,
           networkTxBytes,
         });
-      } catch (statError) {}
+      } catch (statError) {
+        // Container may have stopped between list and stats
+      }
     }
 
-    await db.delete(metrics).where(sql`datetime(timestamp, 'localtime') <= datetime('now', '-24 hours', 'localtime')`).catch(() => {});
-  } catch (err) {}
+    await db.delete(metrics).where(sql`timestamp <= datetime('now', '-24 hours')`).catch(() => {});
+  } catch (err) {
+    console.error("[Worker] Metrics collection error:", err);
+  } finally {
+    runningTasks.delete("metrics");
+  }
 }
 
 export async function checkAutoUpdates() {
+  if (runningTasks.has("updates")) return;
+  runningTasks.add("updates");
   try {
     const updateInfo = await checkForUpdates(false);
     if (updateInfo.hasUpdate && updateInfo.latestVersion !== lastNotifiedUpdateVersion) {
       lastNotifiedUpdateVersion = updateInfo.latestVersion;
       console.log(
-        `🚀 [Cowbox Auto-Updater] New version v${updateInfo.latestVersion} is available (running v${updateInfo.currentVersion})! PyPI: ${updateInfo.pypi.url}`
+        `[Cowbox Auto-Updater] New version v${updateInfo.latestVersion} is available (running v${updateInfo.currentVersion})`
       );
 
-      // Dispatch alert to configured webhook channels (Discord, Slack, Telegram, Webhook)
       await dispatchEvent("system:update_available", {
-        title: `🚀 Cowbox Update Available: v${updateInfo.latestVersion}`,
-        message: `Cowbox v${updateInfo.latestVersion} is now available (current: v${updateInfo.currentVersion}). Upgrade via: ${updateInfo.instructions.pip}`,
+        title: `Cowbox Update Available: v${updateInfo.latestVersion}`,
+        message: `Cowbox v${updateInfo.latestVersion} is now available (current: v${updateInfo.currentVersion}). Upgrade via: ${updateInfo.instructions[updateInfo.activeMethod]}`,
         status: "warning",
       });
     }
   } catch (err) {
-    // Ignore network errors during background update check
+    // Network errors during update check are expected
+  } finally {
+    runningTasks.delete("updates");
   }
+}
+
+export function stopBackgroundWorker() {
+  for (const handle of intervalHandles) {
+    clearInterval(handle);
+  }
+  intervalHandles.length = 0;
+
+  for (const [jobId, task] of Array.from(activeScheduledTasks.entries())) {
+    task.stop();
+  }
+  activeScheduledTasks.clear();
+  workerStarted = false;
+  console.log("[Cowbox Daemon] Background worker stopped");
 }
 
 export function startBackgroundWorker() {
   if (workerStarted) return;
-  if (typeof window !== "undefined") return; // Only run on server
+  if (typeof window !== "undefined") return;
 
   workerStarted = true;
-  console.log("🚀 [Cowbox Daemon] Starting Background Worker (Cron, Metrics, Git Auto-Deploy, Status Monitors & Auto-Update Checker)...");
+  console.log("[Cowbox Daemon] Starting Background Worker...");
 
-  // Run initial tasks
   runStatusChecks();
   syncCronJobs();
   pollGitAutoDeploy();
   collectContainerMetrics();
   checkAutoUpdates();
 
-  // Run status checks every 60 seconds
-  setInterval(() => {
-    runStatusChecks();
-  }, 60000);
+  intervalHandles.push(setInterval(() => { runStatusChecks(); }, 60000));
+  intervalHandles.push(setInterval(() => { syncCronJobs(); }, 30000));
+  intervalHandles.push(setInterval(() => { pollGitAutoDeploy(); }, 60000));
+  intervalHandles.push(setInterval(() => { collectContainerMetrics(); }, 30000));
+  intervalHandles.push(setInterval(() => { checkAutoUpdates(); }, 2 * 60 * 60 * 1000));
 
-  // Sync cron jobs periodically every 30 seconds
-  setInterval(() => {
-    syncCronJobs();
-  }, 30000);
-
-  // Poll Git repositories for auto-deployments every 60 seconds
-  setInterval(() => {
-    pollGitAutoDeploy();
-  }, 60000);
-
-  // Collect performance metrics for running containers every 30 seconds
-  setInterval(() => {
-    collectContainerMetrics();
-  }, 30000);
-
-  // Check for updates every 2 hours
-  setInterval(() => {
-    checkAutoUpdates();
-  }, 2 * 60 * 60 * 1000);
+  process.on("SIGTERM", stopBackgroundWorker);
+  process.on("SIGINT", stopBackgroundWorker);
 }
-

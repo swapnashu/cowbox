@@ -4,6 +4,42 @@ import { users, sessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyApiRequest } from "@/lib/auth/api-key";
 
+/** Permissions granted to built-in roles. `full_access` is admin-only and is never in these sets. */
+const ROLE_GRANTS: Record<string, ReadonlySet<string>> = {
+  admin: new Set(["full_access"]),
+  member: new Set([
+    "files:read", "files:write",
+    "apps:read", "apps:write", "deploy:write",
+    "containers:read", "containers:write",
+    "databases:read", "databases:write",
+    "cron:read", "cron:write",
+    "domains:read", "domains:write",
+    "volumes:read", "volumes:write",
+    "networks:read", "networks:write",
+    "monitoring:read",
+    "api-keys:read",
+    "audit:read",
+  ]),
+  viewer: new Set([
+    "files:read",
+    "apps:read",
+    "containers:read",
+    "databases:read",
+    "cron:read",
+    "domains:read",
+    "volumes:read",
+    "networks:read",
+    "monitoring:read",
+  ]),
+};
+
+function sessionHasPermission(role: string | undefined, requiredPermission: string): boolean {
+  if (role === "admin") return true;
+  if (requiredPermission === "full_access") return false;
+  const grants = ROLE_GRANTS[role ?? ""] || new Set<string>();
+  return grants.has(requiredPermission);
+}
+
 export async function requireAuth(
   req: Request,
   requiredPermission = "full_access"
@@ -36,6 +72,15 @@ export async function requireAuth(
           .limit(1);
 
         if (user) {
+          if (!sessionHasPermission(user.role, requiredPermission)) {
+            return {
+              authenticated: false,
+              response: NextResponse.json(
+                { error: `Forbidden: role '${user.role}' is not permitted to perform this action` },
+                { status: 403 }
+              ),
+            };
+          }
           return { authenticated: true, user };
         }
       }
@@ -68,10 +113,11 @@ export async function requireAuth(
       ),
     };
   } catch (error: any) {
+    console.error("[Auth] Authentication check failed:", error.message);
     return {
       authenticated: false,
       response: NextResponse.json(
-        { error: "Authentication check failed: " + error.message },
+        { error: "Authentication check failed" },
         { status: 500 }
       ),
     };

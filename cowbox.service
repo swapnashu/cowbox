@@ -11,6 +11,10 @@ RemainAfterExit=yes
 ExecStart=/usr/bin/docker start cowbox-server
 ExecStop=/usr/bin/docker stop -t 15 cowbox-server
 ExecReload=/usr/bin/docker restart cowbox-server
+ProtectSystem=strict
+ReadWritePaths=/var/run/docker.sock
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

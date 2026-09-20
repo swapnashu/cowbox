@@ -4,9 +4,12 @@ import { databases, projects } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { deployDatabaseContainer } from "@/lib/docker";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
@@ -26,6 +29,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const body = await req.json();
     const {

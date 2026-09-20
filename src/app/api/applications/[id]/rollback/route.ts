@@ -4,6 +4,7 @@ import { applications, deployments, domains } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { docker, buildTraefikLabels, deployAppContainer } from "@/lib/docker";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(
   req: Request,
@@ -19,6 +20,8 @@ export async function POST(
   };
 
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { deploymentId } = await req.json();
     if (!deploymentId) {
       return NextResponse.json({ error: "deploymentId is required" }, { status: 400 });

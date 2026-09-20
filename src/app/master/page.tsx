@@ -295,16 +295,16 @@ export default function MasterPanelPage() {
               {/* Upgrade Command snippet */}
               <div className="space-y-1.5">
                 <span className="text-xs font-semibold text-amber-800">
-                  Upgrade your Cowbox instance:
+                  Upgrade your Cowbox instance ({updateInfo.activeMethod} install detected):
                 </span>
                 <div className="flex items-center justify-between bg-slate-900 text-slate-100 p-2.5 rounded-lg font-mono text-xs shadow-inner">
                   <code className="text-pink-400">
-                    {updateInfo.instructions.pip}
+                    {updateInfo.instructions[updateInfo.activeMethod]}
                   </code>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => copyToClipboard(updateInfo.instructions.pip)}
+                    onClick={() => copyToClipboard(updateInfo.instructions[updateInfo.activeMethod])}
                     className="h-6 px-2 text-[10px] text-slate-300 hover:text-white hover:bg-slate-800"
                   >
                     {copiedCmd ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}

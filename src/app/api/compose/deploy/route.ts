@@ -5,9 +5,12 @@ import { eq } from "drizzle-orm";
 import { docker, ensureCowboxNetwork, COWBOX_NETWORK, pullDockerImage } from "@/lib/docker";
 import YAML from "yaml";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { projectId, name, composeYaml, envVars = "" } = await req.json();
 

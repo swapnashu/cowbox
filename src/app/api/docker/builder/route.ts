@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { docker, checkDockerConnection } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const status = await checkDockerConnection();
     if (!status.connected) {
       return NextResponse.json({
@@ -75,6 +78,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { keepStorage = 0, pruneAll = true } = await req.json().catch(() => ({}));
 
     // Prune BuildKit cache

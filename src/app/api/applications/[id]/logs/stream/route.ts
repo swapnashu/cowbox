@@ -3,6 +3,7 @@ import { db, initializeDatabase } from "@/lib/db";
 import { applications } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [app] = await db
       .select()

@@ -3,9 +3,12 @@ import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sendNotificationToChannel } from "@/lib/notifications/dispatcher";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const id = params.id;
     const body = await req.json();
     const updateData: any = {};
@@ -25,6 +28,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const id = params.id;
     await db.delete(notifications).where(eq(notifications.id, id));
     return NextResponse.json({ ok: true });
@@ -35,6 +40,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const id = params.id;
     const [channel] = await db.select().from(notifications).where(eq(notifications.id, id)).limit(1);
 

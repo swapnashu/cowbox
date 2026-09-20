@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const container = docker.getContainer(params.id);
     const stats: any = await new Promise((resolve, reject) => {
       container.stats({ stream: false }, (err: any, data: any) => {

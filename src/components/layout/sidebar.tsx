@@ -79,13 +79,13 @@ export function Sidebar() {
         </div>
 
         {/* Navigation Items */}
-        <nav className="p-4 space-y-4">
+        <nav className="p-4 space-y-4" aria-label="Main navigation">
           {navigationGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1" id={`nav-group-${group.label.toLowerCase()}`}>
                 {group.label}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1" role="list" aria-labelledby={`nav-group-${group.label.toLowerCase()}`}>
                 {group.items.map((item) => {
                   const isActive =
                     item.href === "/"
@@ -97,6 +97,8 @@ export function Sidebar() {
                     <Link
                       key={item.name}
                       href={item.href}
+                      role="listitem"
+                      aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150",
                         isActive
@@ -104,7 +106,7 @@ export function Sidebar() {
                           : "text-slate-600 hover:text-pink-600 hover:bg-pink-50/40"
                       )}
                     >
-                      <Icon className={cn("h-4 w-4", isActive ? "text-pink-500" : "text-slate-400")} />
+                      <Icon className={cn("h-4 w-4", isActive ? "text-pink-500" : "text-slate-400")} aria-hidden="true" />
                       {item.name}
                     </Link>
                   );

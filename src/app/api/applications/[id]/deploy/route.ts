@@ -3,23 +3,42 @@ import { db, initializeDatabase } from "@/lib/db";
 import { applications, domains, deployments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { docker, buildTraefikLabels, deployAppContainer, pullDockerImage } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 import crypto from "crypto";
-import { exec, execFile } from "child_process";
+import { execFile } from "child_process";
 import util from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
-const execAsync = util.promisify(exec);
 const execFileAsync = util.promisify(execFile);
+
+const deployLocks = new Map<string, Promise<void>>();
+
+function isPrivateIP(ip: string): boolean {
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.|169\.254\.|::1|fc|fd)/.test(ip);
+}
 
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await requireAuth(req);
+  if (!auth.authenticated) return auth.response!;
+
+  const releaseLock = deployLocks.get(params.id);
+  if (releaseLock) {
+    return NextResponse.json({ error: "Deployment already in progress" }, { status: 409 });
+  }
+
+  let resolveLock: () => void;
+  const lockPromise = new Promise<void>((resolve) => { resolveLock = resolve; });
+  deployLocks.set(params.id, lockPromise);
+
   const startTime = Date.now();
   let deploymentId = crypto.randomUUID();
   let logBuffer: string[] = [];
+  let newContainerId: string | null = null;
 
   const addLog = (msg: string) => {
     const time = new Date().toISOString().substring(11, 19);
@@ -37,7 +56,6 @@ export async function POST(
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
 
-    // Create a new deployment record
     await db.insert(deployments).values({
       id: deploymentId,
       applicationId: app.id,
@@ -48,7 +66,6 @@ export async function POST(
 
     addLog(`Initiating deployment for ${app.name} (${app.appType})...`);
 
-    // Parse Environment Variables
     const envList: string[] = [];
     if (app.envVars) {
       const lines = app.envVars.split("\n");
@@ -60,26 +77,49 @@ export async function POST(
       }
     }
 
-    // Fetch and prepare domains for Traefik routing
     const appDomains = await db
       .select()
       .from(domains)
       .where(eq(domains.applicationId, params.id));
 
-    const traefikLabels = buildTraefikLabels({
-      appName: app.name,
-      domains: appDomains.map((d) => ({
-        domain: d.domain,
-        https: d.https,
-        certificateResolver: d.certificateResolver,
-        pathPrefix: d.pathPrefix || "/",
-      })),
-      containerPort: app.containerPort,
-    });
+    let traefikDomains = appDomains.map((d) => ({
+      domain: d.domain,
+      https: d.https,
+      certificateResolver: d.certificateResolver,
+      pathPrefix: d.pathPrefix || "/",
+    }));
 
-    if (appDomains.length > 0) {
+    if (traefikDomains.length === 0) {
+      let serverIp = "127.0.0.1";
+      try {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+          for (const net of interfaces[name] || []) {
+            if (net.family === "IPv4" && !net.internal) {
+              serverIp = net.address;
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+      
+      const fallbackDomain = `${app.name}.${serverIp}.sslip.io`;
+      traefikDomains.push({
+        domain: fallbackDomain,
+        https: false,
+        certificateResolver: "letsencrypt",
+        pathPrefix: "/",
+      });
+      addLog(`No custom domains found. Using fallback domain: ${fallbackDomain}`);
+    } else {
       addLog(`Configured ${appDomains.length} domain routes with Traefik: ${appDomains.map((d) => d.domain).join(", ")}`);
     }
+
+    const traefikLabels = buildTraefikLabels({
+      appName: app.name,
+      domains: traefikDomains,
+      containerPort: app.containerPort,
+    });
 
     let imageToRun = app.dockerImage || "nginx:alpine";
     if (app.appType === "image") {
@@ -101,18 +141,30 @@ export async function POST(
         throw new Error("Invalid git branch name.");
       }
 
-      addLog(`Cloning repository ${app.gitRepository} (branch: ${branch})...`);
+      const repoUrl = app.gitRepository.trim();
+      if (!/^https?:\/\/.+/.test(repoUrl) && !/^git@.+/.test(repoUrl)) {
+        throw new Error("Invalid repository URL. Only https and ssh protocols are allowed.");
+      }
+
+      addLog(`Cloning repository ${repoUrl} (branch: ${branch})...`);
       const tmpDir = path.join(os.tmpdir(), `cowbox-build-${crypto.randomUUID()}`);
       
       try {
-        await execFileAsync("git", ["clone", "-b", branch, app.gitRepository, tmpDir]);
+        await execFileAsync("git", ["clone", "-b", branch, repoUrl, tmpDir]);
         addLog(`Repository cloned successfully.`);
 
         if (app.appType === "nixpacks") {
           const tag = `cowbox-app-${app.id}-${Date.now()}`;
           addLog(`Building with Nixpacks: ${tag}...`);
           
-          await execAsync(`docker run --rm -v //var/run/docker.sock:/var/run/docker.sock -v "${tmpDir}":"${tmpDir}" -w "${tmpDir}" ghcr.io/railwayapp/nixpacks build . --name ${tag}`);
+          await execFileAsync("docker", [
+            "run", "--rm",
+            "-v", "//var/run/docker.sock:/var/run/docker.sock",
+            "-v", `${tmpDir}:${tmpDir}`,
+            "-w", tmpDir,
+            "ghcr.io/railwayapp/nixpacks",
+            "build", ".", "--name", tag,
+          ]);
           addLog(`Nixpacks Image built successfully.`);
           
           imageToRun = tag;
@@ -142,7 +194,7 @@ export async function POST(
           const tag = `cowbox-app-${app.id}:${Date.now()}`;
           addLog(`Building Docker image ${tag}...`);
           
-          await execAsync(`docker build -t ${tag} "${tmpDir}"`);
+          await execFileAsync("docker", ["build", "-t", tag, tmpDir]);
           addLog(`Image built successfully.`);
           
           imageToRun = tag;
@@ -157,7 +209,6 @@ export async function POST(
       let buildDir = "";
       let isTempDir = false;
 
-      // Check if buildPath exists on disk (e.g. uploaded zip or repo)
       if (app.buildPath && app.buildPath !== "/" && (await fs.stat(app.buildPath).then(() => true).catch(() => false))) {
         buildDir = app.buildPath;
         if (app.dockerfile && !(await fs.stat(path.join(buildDir, "Dockerfile")).then(() => true).catch(() => false))) {
@@ -174,7 +225,7 @@ export async function POST(
 
       try {
         addLog(`Building Docker image from ${buildDir}...`);
-        await execAsync(`docker build -t ${tag} "${buildDir}"`);
+        await execFileAsync("docker", ["build", "-t", tag, buildDir]);
         addLog(`Dockerfile image ${tag} built successfully.`);
         imageToRun = tag;
       } finally {
@@ -184,7 +235,6 @@ export async function POST(
       }
     }
 
-    // If a static Host Port is mapped, we CANNOT do zero-downtime deployments because the new container will fail to bind the same host port.
     let oldContainerStoppedEarly = false;
     if (app.exposedPort && app.containerId) {
       addLog(`Static Host Port ${app.exposedPort} is mapped. Zero-downtime deployment disabled to avoid port conflicts.`);
@@ -200,7 +250,6 @@ export async function POST(
       }
     }
 
-    // Deploy new container
     addLog(`Creating and launching container...`);
     const container = await deployAppContainer({
       applicationId: app.id,
@@ -215,10 +264,10 @@ export async function POST(
       restartPolicy: app.restartPolicy,
     });
 
+    newContainerId = container.id;
     addLog(`Container started! ID: ${container.id.substring(0, 12)}`);
     addLog(`Performing Zero-Downtime Health Check verification...`);
 
-    // Zero-Downtime Health Check Probing
     let isHealthy = false;
     const maxAttempts = 5;
     const probePath = app.healthCheckPath || "/";
@@ -233,7 +282,7 @@ export async function POST(
         const networkInfo = inspectData.NetworkSettings.Networks["cowbox-network"] || inspectData.NetworkSettings.Networks["bridge"];
         const containerIp = networkInfo?.IPAddress;
 
-        if (containerIp) {
+        if (containerIp && !isPrivateIP(containerIp)) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 1500);
 
@@ -262,10 +311,14 @@ export async function POST(
     }
 
     if (!isHealthy) {
-      addLog(`Health Check verified running container state. Routing traffic.`);
+      addLog(`Health Check failed after ${maxAttempts} attempts. Rolling back...`);
+      try {
+        await container.stop({ t: 10 }).catch(() => {});
+        await container.remove({ force: true }).catch(() => {});
+      } catch (e) {}
+      throw new Error("Health check failed. Deployment rolled back.");
     }
 
-    // Stop and clean up old container now that new container is confirmed serving traffic
     if (!oldContainerStoppedEarly && app.containerId && app.containerId !== container.id) {
       addLog(`Gracefully draining and shutting down previous container ${app.containerId.substring(0, 12)}...`);
       try {
@@ -280,7 +333,6 @@ export async function POST(
 
     const duration = Math.floor((Date.now() - startTime) / 1000);
 
-    // Update application state
     await db
       .update(applications)
       .set({
@@ -289,7 +341,6 @@ export async function POST(
       })
       .where(eq(applications.id, app.id));
 
-    // Update deployment record
     await db
       .update(deployments)
       .set({
@@ -310,6 +361,14 @@ export async function POST(
     const duration = Math.floor((Date.now() - startTime) / 1000);
     addLog(`ERROR: ${error.message}`);
 
+    if (newContainerId) {
+      try {
+        const c = docker.getContainer(newContainerId);
+        await c.stop({ t: 5 }).catch(() => {});
+        await c.remove({ force: true }).catch(() => {});
+      } catch (e) {}
+    }
+
     await db
       .update(applications)
       .set({ status: "error" })
@@ -325,8 +384,11 @@ export async function POST(
       .where(eq(deployments.id, deploymentId));
 
     return NextResponse.json(
-      { error: error.message, logs: logBuffer },
+      { error: "Deployment failed", logs: logBuffer },
       { status: 500 }
     );
+  } finally {
+    deployLocks.delete(params.id);
+    resolveLock!();
   }
 }

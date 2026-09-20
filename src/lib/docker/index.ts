@@ -126,7 +126,6 @@ export async function ensureTraefikRunning(letsEncryptEmail = ""): Promise<strin
 
   const traefikArgs = [
     "--api.dashboard=true",
-    "--api.insecure=true",
     "--providers.docker=true",
     "--providers.docker.exposedbydefault=false",
     `--providers.docker.network=${COWBOX_NETWORK}`,
@@ -151,7 +150,6 @@ export async function ensureTraefikRunning(letsEncryptEmail = ""): Promise<strin
       PortBindings: {
         "80/tcp": [{ HostPort: "80" }],
         "443/tcp": [{ HostPort: "443" }],
-        "8080/tcp": [{ HostPort: "8080" }],
       },
       Binds: [
         process.platform === "win32"
@@ -292,6 +290,8 @@ export async function deployAppContainer(options: {
       Memory: memoryBytes > 0 ? memoryBytes : undefined,
       NanoCpus: nanoCpus > 0 ? nanoCpus : undefined,
       Binds: binds.length > 0 ? binds : undefined,
+      SecurityOpt: ["no-new-privileges:true"],
+      CapDrop: ["ALL"],
     },
   });
 
@@ -423,6 +423,7 @@ export async function deployDatabaseContainer(params: {
       PortBindings: portBindings,
       RestartPolicy: { Name: "unless-stopped" },
       Binds: [`${volumeName}:${mountPath}`],
+      SecurityOpt: ["no-new-privileges:true"],
     },
   });
 

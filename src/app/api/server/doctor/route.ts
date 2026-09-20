@@ -3,9 +3,12 @@ import { docker, checkDockerConnection } from "@/lib/docker";
 import { db, initializeDatabase } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const status = await checkDockerConnection();
     if (!status.connected) {
       return NextResponse.json({
@@ -71,8 +74,10 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     // Execute deep prune
     const [prunedContainers, prunedImages, prunedVolumes, prunedBuilder] = await Promise.all([

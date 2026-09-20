@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { token, publicUrl } = await req.json();
 
     // Case 1: Fetch public repository details from GitHub API

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { docker } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const networks = await docker.listNetworks();
     
     const formattedNetworks = networks.map((net) => {
@@ -30,6 +33,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { name, driver = "bridge" } = await req.json();
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -48,6 +53,8 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { id } = await req.json();
     if (!id) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { docker, ensureCowboxNetwork, COWBOX_NETWORK } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { letsEncryptEmail } = await req.json().catch(() => ({ letsEncryptEmail: "" }));
     await ensureCowboxNetwork();
 

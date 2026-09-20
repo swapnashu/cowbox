@@ -4,9 +4,12 @@ import { apiKeys, auditLogs } from "@/lib/db/schema";
 import { generateApiKey } from "@/lib/auth/api-key";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const keys = await db.select({
       id: apiKeys.id,
@@ -26,6 +29,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { name, permissions = "full_access", expiresAt } = await req.json();
 

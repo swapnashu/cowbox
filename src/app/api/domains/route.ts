@@ -3,9 +3,12 @@ import { db, initializeDatabase } from "@/lib/db";
 import { domains, applications } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { searchParams } = new URL(req.url);
     const applicationId = searchParams.get("applicationId");
@@ -28,6 +31,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { applicationId, domain: rawDomain, https = true, certificateResolver = "letsencrypt", pathPrefix = "/" } = await req.json();
 

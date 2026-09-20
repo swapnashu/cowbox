@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { docker } from "@/lib/docker";
 import * as fs from "fs";
 import * as path from "path";
+import { requireAuth } from "@/lib/auth/guard";
 
 const backupsDir = path.join(process.cwd(), "data", "backups");
 
@@ -13,6 +14,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [database] = await db
       .select()

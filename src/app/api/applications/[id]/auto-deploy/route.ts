@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { applications, deployments } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [app] = await db
       .select()
@@ -25,9 +28,8 @@ export async function GET(
       .orderBy(desc(deployments.createdAt))
       .limit(1);
 
-    const hostUrl = req.headers.get("host") || "localhost:9999";
-    const protocol = req.headers.get("x-forwarded-proto") || "http";
-    const webhookUrl = `${protocol}://${hostUrl}/api/webhooks/deploy/${app.id}`;
+    const baseUrl = process.env.COWBOX_URL || process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 9999}`;
+    const webhookUrl = `${baseUrl}/api/webhooks/deploy/${app.id}`;
 
     return NextResponse.json({
       applicationId: app.id,
@@ -50,6 +52,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { autoDeploy, gitBranch, gitRepository } = await req.json();
 

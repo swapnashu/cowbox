@@ -5,12 +5,15 @@ import { eq } from "drizzle-orm";
 import { docker, ensureCowboxNetwork, COWBOX_NETWORK, buildTraefikLabels } from "@/lib/docker";
 import { generateSslipDomain } from "@/lib/domain";
 import os from "os";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [database] = await db
       .select()

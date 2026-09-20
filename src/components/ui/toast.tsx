@@ -50,13 +50,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full" role="status" aria-live="polite">
         {toasts.map((t) => {
           const { border, icon } = getVariantStyles(t.variant);
           return (
             <div
               key={t.id}
               className={`bg-white shadow-lg rounded-xl overflow-hidden border border-slate-200 border-l-4 ${border} animate-in slide-in-from-right-8 fade-in duration-300 pointer-events-auto`}
+              role="alert"
             >
               <div className="p-4 flex items-start gap-3">
                 <div className="flex-shrink-0 mt-0.5">{icon}</div>
@@ -67,6 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => removeToast(t.id)}
                   className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
+                  aria-label="Dismiss notification"
                 >
                   <X className="h-4 w-4" />
                 </button>

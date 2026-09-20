@@ -6,6 +6,7 @@ import AdmZip from "adm-zip";
 import * as fs from "fs";
 import * as path from "path";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
 const buildsBaseDir = path.join(process.cwd(), "data", "builds");
 if (!fs.existsSync(buildsBaseDir)) {
@@ -17,6 +18,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const [app] = await db
       .select()

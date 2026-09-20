@@ -4,7 +4,6 @@ import { apiKeys, auditLogs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export function generateApiKey(): { rawKey: string; keyPrefix: string; keyHash: string } {
-  // Generate 32 bytes of cryptographic randomness
   const secret = crypto.randomBytes(24).toString("hex");
   const rawKey = `cbx_live_${secret}`;
   const keyPrefix = rawKey.substring(0, 16);
@@ -38,7 +37,6 @@ export async function verifyApiRequest(
     "127.0.0.1";
 
   if (!token) {
-    // Log unauthorized attempt
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       action: "API_UNAUTHORIZED_ACCESS",
@@ -51,8 +49,7 @@ export async function verifyApiRequest(
   }
 
   const tokenHash = hashApiKey(token);
-  const allKeys = await db.select().from(apiKeys);
-  const matchedKey = allKeys.find((k) => k.keyHash === tokenHash);
+  const [matchedKey] = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, tokenHash)).limit(1);
 
   if (!matchedKey) {
     await db.insert(auditLogs).values({
@@ -66,12 +63,10 @@ export async function verifyApiRequest(
     return { valid: false, error: "Invalid API key" };
   }
 
-  // Check expiration if set
   if (matchedKey.expiresAt && new Date(matchedKey.expiresAt) < new Date()) {
     return { valid: false, error: "API key has expired" };
   }
 
-  // Check permissions
   const permissions = matchedKey.permissions.split(",").map((p) => p.trim());
   const hasAccess =
     permissions.includes("full_access") ||
@@ -91,14 +86,12 @@ export async function verifyApiRequest(
     return { valid: false, error: `Forbidden: API key lacks required '${requiredPermission}' permission` };
   }
 
-  // Update last used timestamp
   const now = new Date().toISOString();
   await db
     .update(apiKeys)
     .set({ lastUsedAt: now })
     .where(eq(apiKeys.id, matchedKey.id));
 
-  // Log successful API call
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     action: "API_AUTHENTICATED_REQUEST",

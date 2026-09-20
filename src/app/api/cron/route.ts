@@ -3,9 +3,12 @@ import { db, initializeDatabase } from "@/lib/db";
 import { cronJobs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const jobs = await db.select().from(cronJobs);
     return NextResponse.json({ jobs });
@@ -16,6 +19,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const { name, schedule, targetType = "shell", command } = await req.json();
 

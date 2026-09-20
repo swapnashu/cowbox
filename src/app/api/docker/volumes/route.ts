@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { docker, checkDockerConnection } from "@/lib/docker";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const status = await checkDockerConnection();
     if (!status.connected) {
       return NextResponse.json({ volumes: [] });
@@ -47,6 +50,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { name, driver = "local", labels = {} } = await req.json();
 
     if (!name || !name.trim()) {
@@ -76,6 +81,8 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     const { searchParams } = new URL(req.url);
     const volumeName = searchParams.get("name");
     const pruneUnused = searchParams.get("prune") === "true";

@@ -9,14 +9,15 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Support seamless migration from dekployer.db to cowbox.db if existing
 const oldDbPath = path.join(dataDir, "dekployer.db");
 const dbPath = process.env.DATABASE_PATH || path.join(dataDir, "cowbox.db");
 
 if (fs.existsSync(oldDbPath) && !fs.existsSync(dbPath)) {
   try {
     fs.copyFileSync(oldDbPath, dbPath);
-  } catch (e) {}
+  } catch (e) {
+    console.error("[DB] Failed to migrate dekployer.db:", e);
+  }
 }
 
 const client = createClient({
@@ -25,8 +26,12 @@ const client = createClient({
 
 export const db = drizzle(client, { schema });
 
-// Auto-run schema initialization for tables if not present
+let dbInitialized = false;
+
 export async function initializeDatabase() {
+  if (dbInitialized) return;
+  dbInitialized = true;
+
   await client.execute("PRAGMA journal_mode = WAL;");
   await client.execute("PRAGMA synchronous = NORMAL;");
   await client.execute("PRAGMA foreign_keys = ON;");
@@ -285,4 +290,20 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Performance indexes
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_applications_project_id ON applications(project_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_databases_project_id ON databases(project_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_domains_application_id ON domains(application_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_deployments_application_id ON deployments(application_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_app_volumes_application_id ON app_volumes(application_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_metrics_container_id ON metrics(container_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_status_incidents_monitor_id ON status_incidents(monitor_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_compose_stacks_project_id ON compose_stacks(project_id);`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);`);
+
+  console.log("[DB] Database initialized with indexes");
 }

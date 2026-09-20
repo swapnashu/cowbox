@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth/guard";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     const logs = await db
       .select()

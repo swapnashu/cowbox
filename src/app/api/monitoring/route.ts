@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { db, initializeDatabase } from "@/lib/db";
 import { metrics } from "@/lib/db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.authenticated) return auth.response!;
     await initializeDatabase();
     
     const { searchParams } = new URL(req.url);
