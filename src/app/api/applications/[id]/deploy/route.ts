@@ -269,7 +269,7 @@ export async function POST(
     addLog(`Performing Zero-Downtime Health Check verification...`);
 
     let isHealthy = false;
-    const maxAttempts = 30;
+    const maxAttempts = 120;
     const probePath = app.healthCheckPath || "/";
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -283,22 +283,23 @@ export async function POST(
         const containerIp = networkInfo?.IPAddress;
 
         if (containerIp) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 1500);
           try {
-            const probeRes = await fetch(`http://${containerIp}:${app.containerPort}${probePath}?t=${Date.now()}`, {
-              signal: controller.signal,
-              cache: "no-store",
+            const probeSuccess = await new Promise((resolve) => {
+              const http = require('http');
+              const req = http.get(`http://${containerIp}:${app.containerPort}${probePath}`, { timeout: 1500 }, (res: any) => {
+                resolve(res.statusCode < 500);
+              });
+              req.on('error', () => resolve(false));
+              req.on('timeout', () => { req.destroy(); resolve(false); });
             });
-            clearTimeout(timeoutId);
-
-            if (probeRes.status < 500) {
+            
+            if (probeSuccess) {
               isHealthy = true;
-              addLog(`Health Check passed on attempt ${attempt} (HTTP ${probeRes.status} on port ${app.containerPort})!`);
+              addLog(`Health Check passed on attempt ${attempt} on port ${app.containerPort}!`);
               break;
             }
           } catch (fetchErr) {
-            clearTimeout(timeoutId);
+            // ignore
           }
         }
       } catch (inspectErr: any) {
