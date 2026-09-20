@@ -7,9 +7,7 @@ export function generateSessionToken() {
 
 export function createSessionCookie(token: string) {
   const maxAge = 7 * 24 * 60 * 60; // 7 days
-  const isProd = process.env.NODE_ENV === "production";
-  const secure = isProd ? "; Secure" : "";
-  return `cowbox-session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`;
+  return `cowbox-session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
 
 export function clearSessionCookie() {

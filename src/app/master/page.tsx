@@ -226,7 +226,7 @@ export default function MasterPanelPage() {
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-black font-mono text-slate-800">
-                  v{updateInfo?.currentVersion || "0.2.3"}
+                  v{updateInfo?.currentVersion || "0.2.4"}
                 </span>
                 <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 font-medium">
                   Active
@@ -241,7 +241,7 @@ export default function MasterPanelPage() {
               </span>
               <div className="flex items-center justify-between">
                 <span className="text-lg font-black font-mono text-pink-600">
-                  v{updateInfo?.pypi?.version || "0.2.3"}
+                  v{updateInfo?.pypi?.version || "0.2.4"}
                 </span>
                 <a
                   href={updateInfo?.pypi?.url || "https://pypi.org/project/cowbox/"}
@@ -261,7 +261,7 @@ export default function MasterPanelPage() {
               </span>
               <div className="flex items-center justify-between">
                 <span className="text-lg font-black font-mono text-emerald-600">
-                  v{updateInfo?.github?.version || "0.2.3"}
+                  v{updateInfo?.github?.version || "0.2.4"}
                 </span>
                 <a
                   href={updateInfo?.github?.url || "https://github.com/swapnashu/cowbox"}
@@ -317,7 +317,7 @@ export default function MasterPanelPage() {
             <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
               <span>
-                Your Cowbox cluster is currently running the latest official version (v{updateInfo?.currentVersion || "0.2.3"}).
+                Your Cowbox cluster is currently running the latest official version (v{updateInfo?.currentVersion || "0.2.4"}).
               </span>
             </div>
           )}
