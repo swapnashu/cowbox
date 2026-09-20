@@ -16,17 +16,13 @@ ENV PORT=9999
 
 RUN apk add --no-cache docker-cli
 
-COPY --chown=node:node --from=builder /app/package*.json ./
-COPY --chown=node:node --from=builder /app/node_modules ./node_modules
-COPY --chown=node:node --from=builder /app/.next ./.next
-COPY --chown=node:node --from=builder /app/public ./public
-COPY --chown=node:node --from=builder /app/src ./src
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/src ./src
 
 VOLUME [ "/app/data" ]
 EXPOSE 9999
-
-RUN chown -R node:node /app
-
-USER node
 
 CMD ["npm", "start"]
