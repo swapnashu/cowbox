@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       "--providers.docker=true",
       "--providers.docker.exposedbydefault=false",
       `--providers.docker.network=${COWBOX_NETWORK}`,
-      "--entrypoints.web.address=:80",
+      "--entrypoints.web.address=:80", "--entrypoints.web.http.redirections.entryPoint.to=websecure", "--entrypoints.web.http.redirections.entryPoint.scheme=https",
       "--entrypoints.websecure.address=:443",
     ];
 
