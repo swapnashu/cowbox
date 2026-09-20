@@ -282,7 +282,7 @@ export async function POST(
         const networkInfo = inspectData.NetworkSettings.Networks["cowbox-network"] || inspectData.NetworkSettings.Networks["bridge"];
         const containerIp = networkInfo?.IPAddress;
 
-        if (containerIp && !isPrivateIP(containerIp)) {
+        if (containerIp) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 1500);
 
