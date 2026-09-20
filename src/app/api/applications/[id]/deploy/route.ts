@@ -269,7 +269,7 @@ export async function POST(
     addLog(`Performing Zero-Downtime Health Check verification...`);
 
     let isHealthy = false;
-    const maxAttempts = 5;
+    const maxAttempts = 30;
     const probePath = app.healthCheckPath || "/";
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -359,6 +359,7 @@ export async function POST(
     });
   } catch (error: any) {
     const duration = Math.floor((Date.now() - startTime) / 1000);
+    console.error("DEPLOYMENT ERROR TRACE:", error);
     addLog(`ERROR: ${error.message}`);
 
     if (newContainerId) {
