@@ -285,10 +285,10 @@ export async function POST(
         if (containerIp) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 1500);
-
           try {
-            const probeRes = await fetch(`http://${containerIp}:${app.containerPort}${probePath}`, {
+            const probeRes = await fetch(`http://${containerIp}:${app.containerPort}${probePath}?t=${Date.now()}`, {
               signal: controller.signal,
+              cache: "no-store",
             });
             clearTimeout(timeoutId);
 
